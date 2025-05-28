@@ -5,14 +5,6 @@
 from firebase_functions import https_fn
 from firebase_admin import initialize_app
 
-<<<<<<< HEAD
-# initialize_app()
-#
-#
-# @https_fn.on_request()
-# def on_request_example(req: https_fn.Request) -> https_fn.Response:
-#     return https_fn.Response("Hello world!")
-=======
 from firebase_functions import https_fn, options
 from common.utils import handle_exceptions_and_log
 
@@ -88,4 +80,3 @@ def check_vertex_agent_deployment_status(req: https_fn.CallableRequest):
 # To make these functions discoverable by Firebase CLI, ensure they are top-level  
 # and match the names you'd deploy (e.g., firebase deploy --only functions:get_gofannon_tool_manifest)  
 # The Python function name here becomes the Firebase Function name.  
->>>>>>> f5bd3e1ae9f3f38e2cce48025cec4036d5465830

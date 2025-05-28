@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import defaultTheme from '../themes/defaultTheme';
 import clientATheme from '../themes/clientATheme';
 import clientBTheme from '../themes/clientBTheme';
+import carbonUI from '../themes/carbonUI';
 
 const ThemeContext = createContext({
     toggleThemeMode: () => {}, // if you want light/dark toggle within a theme
@@ -15,6 +16,7 @@ export const availableThemes = {
     default: defaultTheme,
     clientA: clientATheme,
     clientB: clientBTheme,
+    carbonUI: carbonUI,
 };
 
 export const getThemeByHostname = () => {
