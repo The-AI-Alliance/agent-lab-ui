@@ -5,52 +5,60 @@ const getGofannonToolManifestCallable = createCallable('get_gofannon_tool_manife
 const deployAgentToVertexCallable = createCallable('deploy_agent_to_vertex');
 const queryDeployedAgentCallable = createCallable('query_deployed_agent');
 const deleteVertexAgentCallable = createCallable('delete_vertex_agent');
-const checkVertexAgentDeploymentStatusCallable = createCallable('check_vertex_agent_deployment_status'); // New
+const checkVertexAgentDeploymentStatusCallable = createCallable('check_vertex_agent_deployment_status');
 
 
 export const fetchGofannonTools = async () => {
     try {
         const result = await getGofannonToolManifestCallable();
-        return result.data; // { success: true, manifest: {...} }
-    } catch (error) {
-        console.error("Error fetching Gofannon tools:", error);
-        throw error;
+        // The backend function _get_gofannon_tool_manifest_logic now returns
+        // { success: true, manifest: tools_array_from_manifest }
+        // where tools_array_from_manifest is manifest_root_object["tools"]
+        if (result.data && result.data.success && Array.isArray(result.data.manifest)) {
+            return { success: true, manifest: result.data.manifest };
+        } else if (result.data && result.data.success) {
+            // This case should ideally not be hit if backend is correct, but good for robustness
+            console.error("Gofannon manifest received, but 'manifest' is not an array:", result.data.manifest);
+            return { success: false, message: "Manifest format error: Expected an array of tools in the 'manifest' field." };
+        }
+        // Handle cases where result.data.success is false or result.data structure is unexpected
+        const errorMessage = result.data?.message || "Failed to fetch Gofannon tools due to an unknown error structure.";
+        console.error("Error fetching Gofannon tools from callable:", result.data);
+        return { success: false, message: errorMessage };
+
+    } catch (error) { // Catch errors from the callable function itself (e.g., network error, Firebase internal error)
+        console.error("Error calling Gofannon tools callable function:", error);
+        const message = error.message || "An unexpected error occurred while fetching Gofannon tools.";
+        return { success: false, message: message };
     }
 };
 
 export const deployAgent = async (agentConfig, agentDocId) => {
     try {
-        // agentConfig is the object matching Firestore structure for an agent
         const result = await deployAgentToVertexCallable({ agentConfig, agentDocId });
-        return result.data; // { success: true, resourceName: "..." } if completes quickly
+        return result.data;
     } catch (error) {
         console.error("Error deploying agent (raw):", error);
-        // Firebase Functions can wrap errors. Check for specific codes or messages indicating timeout.
-        // 'deadline-exceeded' is a common gRPC code that Firebase might surface.
         if (error.code === 'deadline-exceeded' ||
             (error.message && error.message.toLowerCase().includes('deadline exceeded')) ||
             (error.details && typeof error.details === 'string' && error.details.toLowerCase().includes('deadline exceeded'))) {
-            // Return a specific structure to be handled by UI for timeout scenarios
             console.warn("Deployment call timed out. The process may still be running in the backend.");
             return {
-                success: false, // Indicate the callable itself didn't "succeed" in confirming
+                success: false,
                 wasTimeout: true,
                 message: "Deployment initiated, but the confirmation timed out. Please check status. The agent might still be deploying in the background."
             };
         }
-        // For other errors, re-throw them to be handled as standard errors.
         throw error;
     }
 };
 
 export const queryAgent = async (resourceName, message, userId, sessionId, agentDocId) => {
     try {
-        // The 'userId' parameter here actually holds the ADK User ID from the component.
-        // The key in the payload to the Cloud Function must be 'adkUserId'.
         const result = await queryDeployedAgentCallable({
             resourceName,
             message,
-            adkUserId: userId, // Corrected: key is 'adkUserId', value is from the 'userId' parameter
+            adkUserId: userId,
             sessionId,
             agentDocId
         });
@@ -64,7 +72,7 @@ export const queryAgent = async (resourceName, message, userId, sessionId, agent
 export const deleteAgentDeployment = async (resourceName, agentDocId) => {
     try {
         const result = await deleteVertexAgentCallable({ resourceName, agentDocId });
-        return result.data; // { success: true, message: "..." }
+        return result.data;
     } catch (error) {
         console.error("Error deleting agent deployment:", error);
         throw error;
@@ -74,11 +82,9 @@ export const deleteAgentDeployment = async (resourceName, agentDocId) => {
 export const checkAgentDeploymentStatus = async (agentDocId) => {
     try {
         const result = await checkVertexAgentDeploymentStatusCallable({ agentDocId });
-        // Expected backend response: { success: true, status: "...", resourceName: "...", vertexState: "..." }
-        // or { success: true, status: "...", message: "Engine not found..." }
         return result.data;
     } catch (error) {
         console.error("Error checking agent deployment status:", error);
-        throw error; // Let the UI component handle this error (e.g., show an error message)
+        throw error;
     }
 };  

@@ -8,7 +8,7 @@ import {
     TextField, Button, Select, MenuItem, FormControl, InputLabel,
     Paper, Grid, Box, CircularProgress, Typography, IconButton, List,
     ListItem, ListItemText, ListItemSecondaryAction, FormHelperText,
-    Checkbox, FormControlLabel // Added Checkbox, FormControlLabel
+    Checkbox, FormControlLabel
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import EditIcon from '@mui/icons-material/Edit';
@@ -22,7 +22,7 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
     const [instruction, setInstruction] = useState(initialData.instruction || '');
     const [selectedTools, setSelectedTools] = useState(initialData.tools || []);
     const [maxLoops, setMaxLoops] = useState(initialData.maxLoops || 3);
-    const [enableCodeExecution, setEnableCodeExecution] = useState(initialData.enableCodeExecution || false); // New state
+    const [enableCodeExecution, setEnableCodeExecution] = useState(initialData.enableCodeExecution || false);
 
     const [childAgents, setChildAgents] = useState(initialData.childAgents || []);
     const [isChildFormOpen, setIsChildFormOpen] = useState(false);
@@ -37,15 +37,17 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
         setLoadingTools(true);
         setToolError('');
         try {
-            const result = await fetchGofannonTools();
-            if (result.success && result.manifest && result.manifest.tools) {
-                setAvailableGofannonTools(result.manifest.tools);
+            const result = await fetchGofannonTools(); // Returns { success: bool, manifest?: array, message?: string }
+            if (result.success && Array.isArray(result.manifest)) {
+                setAvailableGofannonTools(result.manifest);
             } else {
-                setToolError("Could not load Gofannon tools from manifest.");
+                setToolError(result.message || "Could not load Gofannon tools or manifest is in an unexpected format.");
+                setAvailableGofannonTools([]);
             }
-        } catch (error) {
-            console.error("Error fetching Gofannon tools:", error);
-            setToolError(`Failed to fetch Gofannon tools: ${error.message}`);
+        } catch (error) { // Should be less likely now as fetchGofannonTools handles its internal errors
+            console.error("Critical error during Gofannon tools fetch in AgentForm:", error);
+            setToolError(`Critical failure fetching Gofannon tools: ${error.message}`);
+            setAvailableGofannonTools([]);
         } finally {
             setLoadingTools(false);
         }
@@ -63,7 +65,7 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
         setInstruction(initialData.instruction || '');
         setSelectedTools(initialData.tools || []);
         setMaxLoops(initialData.maxLoops || 3);
-        setEnableCodeExecution(initialData.enableCodeExecution || false); // Initialize new state
+        setEnableCodeExecution(initialData.enableCodeExecution || false);
         setChildAgents(initialData.childAgents || []);
         setFormError('');
     }, [initialData]);
@@ -84,7 +86,7 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
         const agentDataToSubmit = {
             name, description, agentType,
             model, instruction, tools: selectedTools,
-            enableCodeExecution, // Add this to submitted data
+            enableCodeExecution,
         };
 
         if (agentType === 'LoopAgent') {
@@ -92,9 +94,10 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
         }
         if (agentType === 'SequentialAgent' || agentType === 'ParallelAgent') {
             agentDataToSubmit.childAgents = childAgents;
-            // For orchestrators, 'enableCodeExecution' at parent level might not be directly used by the orchestrator itself.
-            // It's more relevant for the child agents or the looped agent in LoopAgent.
-            // We'll keep it here for consistency, and backend can decide how to apply it.
+        }
+
+        if (initialData && initialData.platform) {
+            agentDataToSubmit.platform = initialData.platform;
         }
 
         onSubmit(agentDataToSubmit);
@@ -131,7 +134,6 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
         <Paper elevation={3} sx={{ p: { xs: 2, md: 4 } }}>
             <Box component="form" onSubmit={handleSubmit} noValidate>
                 <Grid container spacing={3}>
-                    {/* ... other fields ... */}
                     <Grid item xs={12}>
                         <TextField label="Agent Name" id="name" value={name} onChange={(e) => setName(e.target.value)} required fullWidth variant="outlined" />
                     </Grid>
@@ -146,7 +148,6 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
                             </Select>
                         </FormControl>
                     </Grid>
-
 
                     {showParentConfig && (
                         <>
@@ -211,16 +212,14 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
                             />
                         </Grid>
                     )}
-                    {/* Orchestrator specific notes - No direct executor or tools for parent */}
                     {showChildConfig && (
                         <Grid item xs={12}>
                             <Typography variant="body2" color="text.secondary" sx={{mb:1}}>
                                 For Sequential/Parallel agents, configure Model, Instruction, Tools, and Code Execution within each Child Agent.
-                                The parent orchestrator itself typically does not use these fields directly.
+                                Any tools selected at this parent level for Sequential/Parallel agents are typically for context or reference and might not be directly executed by the orchestrator itself unless explicitly designed to do so.
                             </Typography>
                         </Grid>
                     )}
-
 
                     {showChildConfig && (
                         <Grid item xs={12}>
@@ -239,7 +238,7 @@ const AgentForm = ({ onSubmit, initialData = {}, isSaving = false }) => {
                                         <ListItem key={child.id || index} divider={index < childAgents.length -1}>
                                             <ListItemText
                                                 primary={child.name}
-                                                secondary={`Model: ${child.model} | Tools: ${child.tools?.length || 0} | Code Exec: ${child.enableCodeExecution ? 'Yes' : 'No'}`}
+                                                secondary={`Model: ${child.model} | Tools: ${child.tools?.length || 0}${child.tools?.some(t => t.configuration) ? ' (some configured)' : ''} | Code Exec: ${child.enableCodeExecution ? 'Yes' : 'No'}`}
                                             />
                                             <ListItemSecondaryAction>
                                                 <IconButton edge="end" aria-label="edit" onClick={() => handleOpenChildForm(child)}>

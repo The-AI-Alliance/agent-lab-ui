@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
     TextField, Button, Select, MenuItem, FormControl, InputLabel,
     Grid, Dialog, DialogTitle, DialogContent, DialogActions, FormHelperText,
-    Checkbox, FormControlLabel // Added Checkbox, FormControlLabel
+    Checkbox, FormControlLabel
 } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
 import ToolSelector from '../tools/ToolSelector';
@@ -23,8 +23,8 @@ const ChildAgentFormDialog = ({
     const [description, setDescription] = useState('');
     const [model, setModel] = useState(GEMINI_MODELS[0]);
     const [instruction, setInstruction] = useState('');
-    const [selectedTools, setSelectedTools] = useState([]);
-    const [enableCodeExecution, setEnableCodeExecution] = useState(false); // New state
+    const [selectedTools, setSelectedTools] = useState([]); // Expects array of tool objects {id, name, ..., configuration}
+    const [enableCodeExecution, setEnableCodeExecution] = useState(false);
     const [formError, setFormError] = useState('');
 
     useEffect(() => {
@@ -33,15 +33,15 @@ const ChildAgentFormDialog = ({
             setDescription(childAgentData.description || '');
             setModel(childAgentData.model || GEMINI_MODELS[0]);
             setInstruction(childAgentData.instruction || '');
-            setSelectedTools(childAgentData.tools || []);
-            setEnableCodeExecution(childAgentData.enableCodeExecution || false); // Init
+            setSelectedTools(childAgentData.tools || []); // Tools should already have their configuration if set
+            setEnableCodeExecution(childAgentData.enableCodeExecution || false);
         } else {
             setName('');
             setDescription('');
             setModel(GEMINI_MODELS[0]);
             setInstruction('');
             setSelectedTools([]);
-            setEnableCodeExecution(false); // Init
+            setEnableCodeExecution(false);
         }
         setFormError('');
     }, [childAgentData, open]);
@@ -55,14 +55,15 @@ const ChildAgentFormDialog = ({
             setFormError('Child agent instruction is required.');
             return;
         }
+        // When saving, selectedTools already contains the configuration if set by ToolSelector
         onSave({
             id: childAgentData?.id || uuidv4(),
             name,
             description,
             model,
             instruction,
-            tools: selectedTools,
-            enableCodeExecution // Add to save
+            tools: selectedTools, // Pass the tools array which includes configurations
+            enableCodeExecution
         });
         onClose();
     };
@@ -134,8 +135,8 @@ const ChildAgentFormDialog = ({
                     <Grid item xs={12}>
                         <ToolSelector
                             availableGofannonTools={availableGofannonTools}
-                            selectedTools={selectedTools}
-                            setSelectedTools={setSelectedTools}
+                            selectedTools={selectedTools} // Pass the state which includes configurations
+                            setSelectedTools={setSelectedTools} // ToolSelector modifies this directly
                             onRefreshGofannon={onRefreshGofannon}
                             loadingGofannon={loadingGofannon}
                             gofannonError={gofannonError}
