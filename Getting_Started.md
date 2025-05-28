@@ -312,6 +312,7 @@ If the cloned repository doesn't include a `.firebaserc` file or a `firebase.jso
 4.  **Project Setup:**
     *   Choose "**Use an existing project**" and select the Firebase project you created earlier.
 5.  **Firestore Setup:**
+    - *Note: These files are already present in the project repo, use the default and do NOT overwrite the files.*
     *   "What file should be used for Firestore Rules?": Press Enter for the default (`firestore.rules`).
     *   "What file should be used for Firestore indexes?": Press Enter for the default (`firestore.indexes.json`).    
         *(You'll need to create `firestore.rules` with your desired security rules, or copy them from the Firebase console if you set them there).*
@@ -487,7 +488,74 @@ To enable these workflows, you (or the repository owner) need to configure the f
 2.  **Log in:** Click the "Login with Google" button.
 3.  You should be redirected to the dashboard, where you can start creating agents.
 
----    
+### Creating a Basic Agent
+
+1. **Access Create Agent Page:**
+   - Click "Create New Agent" button on the dashboard, or
+   - Use the "+" button in the navigation bar
+
+2. **Fill in Basic Information:**
+   - Choose a platform (eg. `Google Vertex AI`)
+   - **Agent Name:** Give your agent a descriptive name (required)
+   - **Description:** (Optional) Add details about the agent's purpose
+   - **Agent Type:** Choose from the dropdown:
+     - `Agent`: Standard single agent
+     - `SequentialAgent`: Executes child agents in sequence
+     - `ParallelAgent`: Runs child agents concurrently
+     - `LoopAgent`: Repeats execution up to a specified number of times
+
+3. **Configure Agent Settings:**
+   - **Model:** Select a Gemini model (e.g., `gemini-1.5-flash-001`)
+   - **Instruction:** Define the agent's behavior using a system prompt
+   - **Enable Built-in Code Execution:** Toggle if you want the agent to execute code
+     (Requires a Gemini 2 model compatible with code execution)
+
+4. **Select Tools:**
+   Your agent can use two types of tools:
+   
+   a. **ADK Built-in Tools:**
+   - Google Search (ADK Built-in)
+   - Vertex AI Search (ADK Built-in)
+   
+   b. **Gofannon Tools:**
+   - Click "Refresh" to load available Gofannon tools
+   - Select tools as needed for your agent's functionality
+   - Configure tool settings if required
+
+5. **Create the Agent:**
+   - Click "Create Agent" button
+   - You'll be redirected to the agent details page
+
+### Example Agent Configurations
+
+1. **Simple Q&A Agent:**
+   ```
+   Name: Basic Assistant
+   Type: Agent
+   Model: gemini-1.5-flash-001
+   Instruction: You are a helpful assistant. Answer questions accurately and concisely.
+   Tools: None
+   ```
+
+2. **Research Agent:**
+   ```
+   Name: Research Helper
+   Type: Agent
+   Model: gemini-1.5-flash-001
+   Instruction: You are a research assistant. Use Google Search to find accurate information and summarize findings.
+   Tools: Google Search (ADK Built-in)
+   Enable Code Execution: No
+   ```
+
+### After Creation
+
+Once your agent is created, you can:
+- Deploy it to Vertex AI
+- Test it in the chat interface
+- Edit its configuration
+- View its deployment status
+- Delete it when no longer needed
+ 
 
 ## 8. User Roles and Permissions System
 
