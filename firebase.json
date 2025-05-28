@@ -1,5 +1,6 @@
 {
   "firestore": {
+    "database": "(default)",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
@@ -8,10 +9,11 @@
       "source": "functions",
       "codebase": "default",
       "ignore": [
-        "node_modules",
+        "venv",
         ".git",
         "firebase-debug.log",
-        "firebase-debug.*.log"
+        "firebase-debug.*.log",
+        "*.local"
       ],
       "runtime": "python311"
     }

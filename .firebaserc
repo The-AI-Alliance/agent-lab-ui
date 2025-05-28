@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "agent-web-ui"
-  }
+    "default": "my-agentlab-ui"
+  },
+  "targets": {},
+  "etags": {}
 }
