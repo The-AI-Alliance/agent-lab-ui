@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button,
-    TextField, Box, Typography, FormHelperText
+    TextField, Box, Typography
 } from '@mui/material';
 
 const ToolSetupDialog = ({ open, onClose, tool, onSave, existingConfiguration }) => {
