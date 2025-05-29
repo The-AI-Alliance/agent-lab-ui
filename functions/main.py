@@ -1,18 +1,11 @@
-# Welcome to Cloud Functions for Firebase for Python!
-# To get started, simply uncomment the below code or create your own.
-# Deploy with `firebase deploy`
+# main.py - Entry point for Firebase Functions  
 
-from firebase_functions import https_fn
-from firebase_admin import initialize_app
+# Initialize global settings and Firebase Admin SDK (via core.py import)  
+# core.py should be imported first if it performs initializations like firebase_admin.initialize_app()  
+# and setup_global_options() that other modules might rely on implicitly or explicitly.  
+# The import of core itself will run firebase_admin.initialize_app().  
+# setup_global_options() is called within core.py upon import if FUNCTION_TARGET is set.  
 
-<<<<<<< HEAD
-# initialize_app()
-#
-#
-# @https_fn.on_request()
-# def on_request_example(req: https_fn.Request) -> https_fn.Response:
-#     return https_fn.Response("Hello world!")
-=======
 from firebase_functions import https_fn, options
 from common.utils import handle_exceptions_and_log
 
@@ -88,4 +81,3 @@ def check_vertex_agent_deployment_status(req: https_fn.CallableRequest):
 # To make these functions discoverable by Firebase CLI, ensure they are top-level  
 # and match the names you'd deploy (e.g., firebase deploy --only functions:get_gofannon_tool_manifest)  
 # The Python function name here becomes the Firebase Function name.  
->>>>>>> f5bd3e1ae9f3f38e2cce48025cec4036d5465830

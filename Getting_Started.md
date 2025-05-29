@@ -148,7 +148,7 @@ This project uses Firebase for authentication, database, backend functions, and 
 
 ### Enable Firestore
 
-1.  Go to "**Realtime Database**" (in the "Build" section).
+1.  Go to "**Firestore Database**" (in the "Build" section).
 2.  Click "**Create database**".
 3.  Choose a "Cloud Firestore location" (e.g., `us-central1`). **This cannot be changed later.**
 4.  Choose "**Start in production mode**" or "**Start in test mode**". For initial development, "test mode" is easier but less secure. You can change rules later.
