@@ -16,6 +16,7 @@ from common.adk_helpers import (
 def _deploy_agent_to_vertex_logic(req: https_fn.CallableRequest):
     agent_config_data = req.data.get("agentConfig")
     agent_doc_id = req.data.get("agentDocId")
+    logger.info(f"--- RAW AGENT CONFIG RECEIVED for deployment (Doc ID: {agent_doc_id}) ---: {agent_config_data}")
 
     if not agent_config_data or not agent_doc_id:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Agent config (agentConfig) and Firestore document ID (agentDocId) are required.")

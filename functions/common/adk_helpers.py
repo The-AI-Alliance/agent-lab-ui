@@ -9,8 +9,7 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.models.lite_llm import LiteLlm
 
 def _prepare_agent_kwargs_from_config(agent_config, adk_agent_name: str, context_for_log: str = ""):
-    logger.info(f"Preparing kwargs for ADK agent '{adk_agent_name}' {context_for_log}. Original config name: '{agent_config.get('name', 'N/A')}'")
-
+    logger.info(f"--- AGENT CONFIG RECEIVED by _prepare_agent_kwargs_from_config for {adk_agent_name} ---: {agent_config}")
     instantiated_tools = []
     user_defined_tools_config = agent_config.get("tools", [])
     for tc_idx, tc in enumerate(user_defined_tools_config):
