@@ -1,6 +1,6 @@
 // src/pages/DashboardPage.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMyAgents, getPublicAgents, deleteAgentFromFirestore, createAgentInFirestore } from '../services/firebaseService';
 import { deleteAgentDeployment } from '../services/agentService';

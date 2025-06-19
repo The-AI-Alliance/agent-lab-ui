@@ -2,14 +2,17 @@ rules_version = '2';
 service cloud.firestore {  
   match /databases/{database}/documents {  
 
+    // Helper function to check if the requester is an admin (more robust)
+    // Placed here to be globally accessible within this match block
+    function isAdmin() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             // Use .get() for safer access to nested properties
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permissions', {}).get('isAdmin', false) == true;
+    }
+
     // --- Users Collection ---
     match /users/{userId} {
-      // Helper function to check if the requester is an admin
-      function isAdmin() {
-        return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.isAdmin == true;
-      }
-
       // User can read their own profile. Admin can read any user's profile.
       allow get: if request.auth.uid == userId || isAdmin();
 
@@ -22,13 +25,12 @@ service cloud.firestore {
 
       // User can update specific fields of their own profile.
       // Admin can update any user's 'permissions' and 'permissionsLastUpdatedAt' fields.
-      allow update: if request.auth.uid == userId &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt', 'email', 'displayName', 'photoURL', 'updatedAt'])
+      allow update: if (request.auth.uid == userId &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt', 'email', 'displayName', 'photoURL', 'updatedAt']))
                     || // OR
-                    isAdmin() &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasAny(['permissions', 'permissionsLastUpdatedAt']);
-                       // To be more strict, admins should ONLY be able to update permissions and related fields:
-                       // request.resource.data.diff(resource.data).affectedKeys().hasOnly(['permissions', 'permissionsLastUpdatedAt']);
+                    (isAdmin() &&
+                       // More strict: admins should ONLY be able to update permissions and related fields
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['permissions', 'permissionsLastUpdatedAt', 'updatedAt'])); // Added updatedAt for admin changes
 
       allow delete: if isAdmin();
     }
@@ -38,12 +40,11 @@ service cloud.firestore {
       function isOwner(docData) {
         return request.auth.uid == docData.userId;
       }
-      // Re-declared isAdmin for local scope if needed, or use a global function reference
-      function isAdmin() { // Ensure this is defined or accessible globally if not re-declared
-        return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.isAdmin == true;
-      }
+      // isAdmin() is now globally defined above
+
       function isAgentPublic() {
+        // Ensure resource.data is not null if this is called in a context where resource might not exist (e.g. list)
+        // However, for 'get', resource.data is safe. For 'list', this function isn't directly used in a way that would be unsafe.
         return resource.data.isPublic == true;
       }
 
@@ -60,7 +61,7 @@ service cloud.firestore {
       // Users can list their own agents OR public agents. Client makes separate queries.
       allow list: if isAdmin() || (
                      request.auth.uid != null &&
-                     request.query.resource.__name__[0] == 'projects' && // General sanity check
+                     // REMOVED: request.query.resource.__name__[0] == 'projects' &&
                      request.query.filters.size() > 0 && (
                        // Querying own agents
                        (request.query.filters[0].fieldPath == "userId" &&
@@ -101,7 +102,7 @@ service cloud.firestore {
                     ) ||
                     (isAdmin() &&
                       request.resource.data.userId == resource.data.userId && // Admin cannot change userId
-                      request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                      request.resource.data.diff(resource.data).affectedKeys().hasAny([ // hasAny is fine for admin as long as it's a subset of all possible fields
                         'name', 'description', 'agentType', 'instruction', 'tools', 'enableCodeExecution',
                         'usedCustomRepoUrls', 'selectedProviderId', 'litellm_model_string', 'litellm_api_base',
                         'litellm_api_key', 'outputKey', 'maxLoops', 'childAgents', 'platform',
@@ -130,31 +131,25 @@ service cloud.firestore {
       function canRunAgent() {
         return request.auth != null &&
                exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.canRunAgent == true;
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('permissions', {}).get('canRunAgent', false) == true;
       }
-      function isAdmin() { // Ensure this is defined or accessible globally if not re-declared
-        return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.isAdmin == true;
-      }
+      // isAdmin() is globally defined
 
       // Agent owner OR if agent is public, and user has 'canRunAgent' permission can create runs. Admin can also create.
       allow create: if ((isAgentOwnerForRuns() || isParentAgentPublic()) && canRunAgent()) || isAdmin();
 
       // Agent owner OR if agent is public can read their agent's runs. Admin can read any.
-      allow read: if isAgentOwnerForRuns() || isParentAgentPublic() || isAdmin();
+      allow read: if isAgentOwnerForRuns() || isParentAgentPublic() || isAdmin(); // allow get is alias for read
       allow list: if isAgentOwnerForRuns() || isParentAgentPublic() || isAdmin(); // For listing runs for a specific agent
     }
 
     // --- Gofannon Tool Manifest ---
     match /gofannonToolManifest/{docId} {
-      function isAdmin() { // Ensure this is defined or accessible globally if not re-declared
-        return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions.isAdmin == true;
-      }
+      // isAdmin() is globally defined
       // Authenticated users can read.
-      allow read: if request.auth != null;
+      allow read: if request.auth != null; // allow get is alias for read
       // Only admin (or a specific service account/function) can write.
-      allow write: if isAdmin();
+      allow write: if isAdmin(); // write covers create, update, delete
     }
   }
 }
