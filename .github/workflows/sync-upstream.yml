@@ -1,0 +1,80 @@
+name: Sync Upstream with Conflict Resolution
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: 'Upstream tag to sync with'
+        required: true
+        type: string
+      new_branch:
+        description: 'New branch name for the update'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}  # Use PAT instead of default token
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"  
+          git config user.email "actions@github.com"  
+          git config merge.ours.driver true  
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/The-AI-Alliance/agent-lab-ui.git  
+          git fetch upstream --tags --force  
+
+      - name: List available upstream tags
+        run: |
+          echo "Available tags in upstream:"  
+          git ls-remote --tags upstream | awk -F/ '{print $3}' | sort -V  
+
+      - name: Verify tag exists
+        run: |
+          if git show-ref --tags | grep -qi "${{ github.event.inputs.upstream_tag }}"; then  
+            echo "Tag ${{ github.event.inputs.upstream_tag }} found"  
+          else  
+            echo "##[error]Tag ${{ github.event.inputs.upstream_tag }} not found in upstream"  
+            echo "Available tags:"  
+            git show-ref --tags  
+            exit 1  
+          fi  
+
+      - name: Create and switch to new branch
+        run: git checkout -b ${{ github.event.inputs.new_branch }}
+
+      - name: Merge upstream changes
+        run: |
+          git merge --no-commit --no-ff ${{ github.event.inputs.upstream_tag }} || true  
+
+      - name: Resolve conflicts (keep local version)
+        run: |
+          conflicted_files=$(git diff --name-only --diff-filter=U)  
+          if [ -n "$conflicted_files" ]; then  
+            echo "Resolving conflicts in favor of local changes"  
+            git checkout --ours -- $conflicted_files  
+            git add $conflicted_files  
+          fi  
+
+      - name: Commit merge result
+        run: |
+          if ! git diff-index --quiet HEAD --; then  
+            git commit -m "Merge upstream ${{ github.event.inputs.upstream_tag }} (local changes preserved)"  
+          else  
+            echo "No merge commit needed"  
+          fi  
+
+      - name: Push to new branch
+        run: git push origin ${{ github.event.inputs.new_branch }}
