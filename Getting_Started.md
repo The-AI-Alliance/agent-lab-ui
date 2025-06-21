@@ -135,6 +135,8 @@ This project uses Firebase for authentication, database, backend functions, and 
     };    
     ```    
     You will need these values for `src/firebaseConfig.json` in the next section, and also for GitHub Actions secrets if you enable automated deployments.
+    **Github Action Deployments**: Do not create `src/firebaseConfig.json`. Instead add the information above into an
+    environment secret called `FIREBASE_CONFIG_JSON`
 6.  Click "**Continue to console**".
 
 ### Enable Authentication
@@ -151,42 +153,11 @@ This project uses Firebase for authentication, database, backend functions, and 
 1.  Go to "**Firestore Database**" (in the "Build" section).
 2.  Click "**Create database**".
 3.  Choose a "Cloud Firestore location" (e.g., `us-central1`). **This cannot be changed later.**
-4.  Choose "**Start in production mode**" or "**Start in test mode**". For initial development, "test mode" is easier but less secure. You can change rules later.
-    *   **Test mode rule (expires in 30 days):**
-        ```    
-        rules_version = '2';    
-        service cloud.firestore {    
-          match /databases/{database}/documents {    
-            match /{document=**} {    
-              allow read, write: if request.time < timestamp.date(YEAR, MONTH, DAY+30);    
-            }    
-          }    
-        }    
-        ```    
-    *   **Production mode (secure - recommended starting point):** We'll deploy actual rules later. For now, you can use this minimal rule that allows authenticated users to read/write their own data (adjust as needed for the app's logic):
-        ```    
-        rules_version = '2';    
-        service cloud.firestore {    
-          match /databases/{database}/documents {    
-            // Example: Agents can be read by anyone, written only by owner    
-            match /agents/{agentId} {    
-              allow read: if true; // Or if request.auth != null;    
-              allow create, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;    
-            }    
-            // Example: Gofannon manifest readable by authenticated users    
-            match /gofannonToolManifest/{docId} {    
-               allow read: if request.auth != null;    
-               allow write: if false; // Only functions should write this    
-            }    
-            // Default deny all other paths    
-            match /{document=**} {    
-              allow read, write: if false;    
-            }    
-          }    
-        }    
-        ```    
-        **For simplicity during initial setup, you might start with test mode and then deploy stricter rules.**
+4.  Choose "**Start in production mode**" or "**Start in test mode**". Either selection is fine, since you will update the rules 
+    in the step after next.
 5.  Click "**Enable**".
+6. Once it has finished provisioning, click on the tab 'Rules' and copy and paste the contents of [./firestore.rules](firestore.rules)
+7. Click 'Publish'
 
 ### Enable Firebase Functions
 
@@ -214,11 +185,12 @@ Now, let's get the project code onto your computer and configure it.
 
 The frontend application needs your Firebase project's credentials.
 
+**If you are doing cloud deployments, put this JSON in a secret called `FIREBASE_CONFIG_JSON` and skip the following steps.**
 1.  Inside the cloned project directory (`agentlabui`), navigate to the `src` folder:
     ```bash    
     cd src    
     ```    
-2.  Create a new file named `firebaseConfig.json`.
+2.  Create a new file named `firebaseConfig.json`. 
 3.  Open `src/firebaseConfig.json` in your code editor.
 4.  Paste the `firebaseConfig` object you copied from the Firebase console earlier. It should look like this, but with **your actual values**:
     ```json    
@@ -246,7 +218,9 @@ The frontend application needs your Firebase project's credentials.
     ```    
     (If you prefer Yarn: `yarn install`)
 
-### Create Gofannon Manifest
+### Create Gofannon Manifest - Deprecated
+
+We will be moving to MCP and removing the manifests. 
 
 The backend functions expect a Gofannon tool manifest file.
 
@@ -487,7 +461,20 @@ To enable these workflows, you (or the repository owner) need to configure the f
     *   After deployment: Use the Firebase Hosting URL provided by `firebase deploy` or the GitHub Actions workflow.
 2.  **Log in:** Click the "Login with Google" button.
 3.  You should be redirected to the dashboard, where you can start creating agents.
+4. The first user _should_ have admin permissions, but a known bug exists where they don't. If you get a screen saying you
+   are unauthorized- you will need to login to firestore and add a map under the key `permissions` with the following
+   ```json
+   {
+    "isAdmin": true,
+    "canCreateAgent": true, 
+    "canRunAgent": true,
+    "isAuthorized": true
+   }
+   ```
 
+### APIs Required
+
+1. Cloud Build API - For deploying functions.
 ### Creating a Basic Agent
 
 1. **Access Create Agent Page:**
@@ -634,7 +621,7 @@ The Firestore security rules (`firestore.rules`) have been updated to support th
 
 *   **Permission Errors (Firebase/GCP):**
     *   Ensure your Firebase project is on the Blaze plan for Functions.
-    *   Double-check IAM permissions for the `your-project-id@appspot.gserviceaccount.com` service account in the GCP console, especially for Vertex AI and Cloud Storage access. For GitHub Actions, ensure the service account used in `FIREBASE_SERVICE_ACCOUNT_AGENT_WEB_UI` has "Firebase Hosting Admin".
+    *   Double-check IAM permissions for the `your-project-id@appspot.gserviceaccount.com` service account in the GCP console, especially for Vertex AI and Cloud Storage access. For GitHub Actions, ensure the service account used in `FIREBASE_SERVICE_ACCOUNT_AGENT_WEB_UI` has "Firebase Hosting Admin" (and 'Owner' if using git actions to deploy functions).
     *   Verify Firestore security rules.
 *   **`firebaseConfig.json` not found (Local Development):** Ensure you've created `src/firebaseConfig.json` correctly with your project's credentials. For GitHub Actions, ensure the `FIREBASE_CONFIG_JSON` secret is set.
 *   **Function deployment errors:**
