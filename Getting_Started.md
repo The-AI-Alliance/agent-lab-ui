@@ -119,8 +119,9 @@ AgentLabUI uses Google Cloud Tasks to run agent queries in the background. This 
     -   Find the service account named `your-project-id@appspot.gserviceaccount.com`.
     -   Click the pencil icon (Edit principal) for this service account.
     -   Click **+ ADD ANOTHER ROLE** and add the following two roles:
-        -   `Cloud Tasks Enqueuer`: Allows the function to add new tasks to the queue.  
-        -   `Service Account User`: Allows the service account to generate credentials for itself, which is required when creating tasks that invoke other Cloud Functions.  
+        -   `Cloud Tasks Enqueuer`: Allows the function to add new tasks to the queue.
+        -   `Owner`: Allows the service account to act as an account owner and all services. This should be replaced with the more precise roles.   
+        -   `Service Account User`: Allows the service account to generate credentials for itself. which is required when creating tasks that invoke other Cloud Functions.  
     -   Click **Save**.
 
 ### Vertex AI Configuration (for Agent Deployment)
@@ -177,7 +178,7 @@ In your forked repository on GitHub:
 
 **`FIREBASE_CONFIG_JSON`**
 - **Purpose:** Provides Firebase configuration for building and deployment
-- **Content:** The complete `firebaseConfig` object from Firebase setup:
+- **Content:** The complete `firebaseConfig` object from Firebase setup. **Remember to add the double quotes around the keys, as they will NOT be double quoted in the object from the Firebase setup**:
 ```json
 {
   "apiKey": "your-api-key",
