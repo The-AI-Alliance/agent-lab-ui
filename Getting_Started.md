@@ -120,7 +120,7 @@ AgentLabUI uses Google Cloud Tasks to run agent queries in the background. This 
     -   Click the pencil icon (Edit principal) for this service account.
     -   Click **+ ADD ANOTHER ROLE** and add the following two roles:
         -   `Cloud Tasks Enqueuer`: Allows the function to add new tasks to the queue.
-        -   `Owner`: Allows the service account to act as an account owner and all services. This should be replaced with the more precise roles.   
+        -   `Owner`: Allows the service to act as an account owner and all services. This should be replaced with the more precise roles.   
         -   `Service Account User`: Allows the service account to generate credentials for itself. which is required when creating tasks that invoke other Cloud Functions.  
     -   Click **Save**.
 
