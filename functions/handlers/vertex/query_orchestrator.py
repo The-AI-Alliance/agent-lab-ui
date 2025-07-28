@@ -22,7 +22,8 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
     chat_id = data.get("chatId")
     parent_message_id = data.get("parentMessageId") # Can be null
 
-    stuffed_context_items = data.get("stuffedContextItems") # <-- GET THE CONTEXT
+    stuffed_context_items = data.get("stuffedContextItems")
+
     firebase_auth_uid = req.auth.uid if req.auth else "unknown_firebase_auth_uid"
 
     if not chat_id or not adk_user_id:

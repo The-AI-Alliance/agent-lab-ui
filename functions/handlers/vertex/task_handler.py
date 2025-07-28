@@ -31,6 +31,8 @@ from google.genai.types import Content, Part
 
 storage_client = storage.Client()
 
+storage_client = storage.Client()
+
 async def get_full_message_history(chat_id, leaf_message_id):
     """Reconstructs the conversation history leading up to a specific message."""
     messages = {}
@@ -390,12 +392,30 @@ async def _execute_and_stream_to_firestore(
 
         session = await remote_app_runner.session_service.create_session(app_name=resource_name, user_id=adk_user_id)
         current_adk_session_id = session.id
+        # … (your code that fills in multimodal_parts from history & images) …
 
-        # Construct multimodal input for the ADK
+        # --- START PORTED PREFIX LOGIC ---
+        stuffed_context_items = assistant_message_data.get("run", {}).get("stuffedContextItems", [])
+        if stuffed_context_items and isinstance(stuffed_context_items, list):
+            logger.info(f"[TaskExecutor] Prepending {len(stuffed_context_items)} stuffed context items as one text part.")
+            prefix_chunks = []
+            for item in stuffed_context_items:
+                item_name = item.get("name", "Unnamed Context Item")
+                item_content = item.get("content", "[Content not available]")
+                prefix_chunks.append(
+                    f"File: {item_name}\n``` \n{item_content}\n```"
+                )
+                # join with separators & append "User Query:"
+            prefix_text = "\n---\n".join(prefix_chunks) + "\n---\nUser Query:\n"
+            # insert at front of your multimodal_parts
+            multimodal_parts.insert(0, {"type": "text", "data": prefix_text})
+        # --- END PORTED PREFIX LOGIC ---
+
+        # Now construct multimodal input for the ADK
         adk_parts = []
         for part_data in multimodal_parts:
             if part_data["type"] == "text":
-                adk_parts.append(Part.from_text(text= part_data["data"]))
+                adk_parts.append(Part.from_text(text=part_data["data"]))
             elif part_data["type"] == "image":
                 gs_uri = part_data["gs_uri"]
                 bucket_name = gs_uri.split('/')[2]
@@ -405,6 +425,28 @@ async def _execute_and_stream_to_firestore(
                 image_bytes = blob.download_as_bytes()
                 mime_type = part_data.get("mimeType", "image/jpeg")
                 adk_parts.append(Part.from_data(data=image_bytes, mime_type=mime_type))
+
+            # Wrap into Content & send to ADK
+        new_message_content = Content(parts=adk_parts, role="user")
+
+        final_text = ""
+        errors = []
+        try:
+            async for event_obj in remote_app_runner.run_async(
+                    user_id=adk_user_id,
+                    session_id=current_adk_session_id,
+                    new_message=new_message_content
+            ):
+                event_dict = event_obj.model_dump()
+                assistant_message_ref.update({"run.outputEvents": firestore.ArrayUnion([event_dict])})
+                content = event_dict.get("content", {})
+                if content and content.get("parts"):
+                    for part in content["parts"]:
+                        if "text" in part:
+                            final_text += part["text"]
+        except Exception as e_run:
+            logger.error(f"Error during Vertex ADK run: {e_run}", exc_info=True)
+            errors.append(f"ADK runner failed: {str(e_run)}")
 
         new_message_content = Content(parts=adk_parts, role="user")
 
@@ -448,6 +490,40 @@ async def _execute_and_stream_to_firestore(
         from google.adk.sessions import InMemorySessionService
         from google.adk.artifacts import InMemoryArtifactService
         from google.adk.memory import InMemoryMemoryService
+
+        # Construct multimodal input for LiteLLM
+        litellm_content = []
+        full_message_text_for_model = ""
+        for part_data in multimodal_parts:
+            if part_data["type"] == "text":
+                # For LiteLLM, we can aggregate text into a single part or multiple
+                full_message_text_for_model += part_data["data"] + "\n"
+            elif part_data["type"] == "image":
+                public_url = part_data.get("public_url")
+                logger.info("Public URL for image part: %s", public_url)
+                if not public_url:
+                    # This is the critical change. We no longer try to sign here.
+                    # We raise an error if the public URL is missing.
+                    error_msg = f"Image part is missing its public URL for LiteLLM call. Stored gs_uri was {part_data.get('gs_uri')}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+                litellm_content.append({"type": "image_url", "image_url": {"url": public_url}})
+
+                # Prepend text content to the list
+        if full_message_text_for_model.strip():
+            litellm_content.insert(0, {"type": "text", "text": full_message_text_for_model.strip()})
+
+            # This is a workaround to pass the complex structure to the ADK's LiteLLM wrapper.
+        # We pass a special JSON string that the LiteLLM model class in adk_helpers will be adapted to parse.
+        # If no images, we pass a simple text string.
+        if any(p['type'] == 'image_url' for p in litellm_content):
+            # This indicates to the underlying model wrapper to use the multimodal format.
+            message_content_for_runner = Content(role="user", parts=[Part.from_text(
+                text= json.dumps({"multimodal_content": litellm_content}))
+            ])
+        else:
+            message_content_for_runner = Content(role="user", parts=[Part.from_text(text = full_message_text_for_model)])
+>>>>>>> 8aa4c4ad (Image upload to context works)
 
         # Construct multimodal input for LiteLLM
         litellm_content = []

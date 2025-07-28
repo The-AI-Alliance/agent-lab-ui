@@ -4,7 +4,7 @@ import base64
 import uuid
 import requests
 from google.cloud import storage
-import io # For PyPDF2 with in-memory bytes
+import io
 from pypdf import PdfReader
 
 from firebase_functions import https_fn
