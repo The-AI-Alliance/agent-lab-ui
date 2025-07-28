@@ -1,8 +1,8 @@
 // src/pages/AgentsPage.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getMyAgents, getPublicAgents, deleteAgentFromFirestore, createAgentInFirestore } from '../services/firebaseService';
+import { getMyAgents, getPublicAgents, deleteAgentFromFirestore, createAgentInFirestore, updateAgentInFirestore } from '../services/firebaseService';
 import { deleteAgentDeployment } from '../services/agentService';
 import AgentList from '../components/agents/AgentList';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -28,6 +28,7 @@ const AgentsPage = () => {
     const [publicAgents, setPublicAgents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [deletingAgentId, setDeletingAgentId] = useState(null);
+    const [copying, setCopying] = useState(false);
     const [error, setError] = useState(null);
     const [isPlatformDialogOpen, setIsPlatformDialogOpen] = useState(false);
 
@@ -36,28 +37,72 @@ const AgentsPage = () => {
     const fileInputRef = useRef(null);
 
 
-    useEffect(() => {
+    const fetchAgents = useCallback(async () => {
         if (currentUser) {
-            const fetchAgents = async () => {
-                try {
-                    setLoading(true);
-                    setError(null);
-                    const [userAgentsData, publicAgentsData] = await Promise.all([
-                        getMyAgents(currentUser.uid),
-                        getPublicAgents(currentUser.uid)
-                    ]);
-                    setMyAgents(userAgentsData);
-                    setPublicAgents(publicAgentsData);
-                } catch (err) {
-                    console.error("Error fetching agents:", err);
-                    setError("Failed to load agents. Please try again.");
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchAgents();
+            try {
+                // Keep setLoading true only on initial fetch, not on subsequent refetches
+                // setLoading(true);
+                setError(null);
+                const [userAgentsData, publicAgentsData] = await Promise.all([
+                    getMyAgents(currentUser.uid),
+                    getPublicAgents(currentUser.uid)
+                ]);
+                setMyAgents(userAgentsData);
+                setPublicAgents(publicAgentsData);
+            } catch (err) {
+                console.error("Error fetching agents:", err);
+                setError("Failed to load agents. Please try again.");
+            } finally {
+                setLoading(false);
+            }
         }
     }, [currentUser]);
+
+    useEffect(() => {
+        fetchAgents();
+    }, [fetchAgents]);
+
+    const handleCopyAgent = async (agentToCopy) => {
+        if (!agentToCopy || !currentUser) return;
+        if (!window.confirm(`Are you sure you want to create a copy of "${agentToCopy.name}"?`)) {
+            return;
+        }
+
+        setCopying(true);
+        setError(null);
+        try {
+            const agentDataForCopy = JSON.parse(JSON.stringify(agentToCopy));
+            agentDataForCopy.name = `${agentToCopy.name}_Copy`;
+
+            // createAgentInFirestore with isImport=true handles resetting metadata
+            await createAgentInFirestore(currentUser.uid, agentDataForCopy, true);
+            await fetchAgents();
+        } catch (err) {
+            console.error("Error copying agent:", err);
+            setError(`Failed to copy agent: ${err.message}`);
+        } finally {
+            setCopying(false);
+        }
+    };
+
+    const handleTogglePublic = async (agent, isPublic) => {
+        const originalMyAgents = [...myAgents];
+        const originalPublicAgents = [...publicAgents];
+
+        const updateAgentInList = (list) => list.map(a => a.id === agent.id ? { ...a, isPublic } : a);
+        setMyAgents(updateAgentInList);
+        setPublicAgents(updateAgentInList);
+
+        try {
+            await updateAgentInFirestore(agent.id, { isPublic });
+            await fetchAgents();
+        } catch (err) {
+            console.error("Error toggling public status:", err);
+            setError(`Failed to update agent status: ${err.message}`);
+            setMyAgents(originalMyAgents);
+            setPublicAgents(originalPublicAgents);
+        }
+    };
 
     const handleDeleteAgentConfig = async (agentToDelete) => {
         if (!agentToDelete || !agentToDelete.id) return;
@@ -79,8 +124,7 @@ const AgentsPage = () => {
                     }
                 }
                 await deleteAgentFromFirestore(agentToDelete.id);
-                setMyAgents(prevAgents => prevAgents.filter(agent => agent.id !== agentToDelete.id));
-                setPublicAgents(prevAgents => prevAgents.filter(agent => agent.id !== agentToDelete.id));
+                await fetchAgents();
             } catch (err) {
                 console.error("Error deleting agent config:", err);
                 setError(`Failed to delete agent configuration "${agentToDelete.name}": ${err.message}`);
@@ -128,8 +172,8 @@ const AgentsPage = () => {
     const handleFileImport = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        setError(null);
         setLoading(true);
+        setError(null);
 
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -140,13 +184,9 @@ const AgentsPage = () => {
                     throw new Error("Imported JSON is missing required fields (name, agentType, modelId).");
                 }
 
-                const agentDataForFirestore = { ...importedData };
-                // Clean up fields that should not be imported
-                const fieldsToDelete = ['id', 'userId', 'isPublic', 'createdAt', 'updatedAt', 'deploymentStatus', 'vertexAiResourceName', 'lastDeployedAt', 'lastDeploymentAttemptAt', 'deploymentError', 'litellm_api_key'];
-                fieldsToDelete.forEach(field => delete agentDataForFirestore[field]);
-
-                const newAgentId = await createAgentInFirestore(currentUser.uid, agentDataForFirestore, true);
-                alert(`Agent "${agentDataForFirestore.name}" imported successfully!`);
+                // createAgentInFirestore with isImport=true handles resetting metadata
+                const newAgentId = await createAgentInFirestore(currentUser.uid, importedData, true);
+                alert(`Agent "${importedData.name}" imported successfully!`);
                 navigate(`/agent/${newAgentId}/edit`);
             } catch (parseError) {
                 console.error("Error importing agent:", parseError);
@@ -160,7 +200,7 @@ const AgentsPage = () => {
     };
 
 
-    if (loading && myAgents.length === 0 && publicAgents.length === 0) return <Box display="flex" justifyContent="center" py={5}><LoadingSpinner /></Box>;
+    if (loading) return <Box display="flex" justifyContent="center" py={5}><LoadingSpinner /></Box>;
 
     return (
         <Container maxWidth="lg">
@@ -221,14 +261,15 @@ const AgentsPage = () => {
 
             {error && <ErrorMessage message={error} />}
             {deletingAgentId && <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2}}><CircularProgress size={20} sx={{mr:1}} /> <Typography>Deleting agent...</Typography></Box>}
+            {copying && <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', my: 2}}><CircularProgress size={20} sx={{mr:1}} /> <Typography>Copying agent...</Typography></Box>}
 
             <Typography variant="h5" component="h2" gutterBottom sx={{mt: 3}}>
                 Your Agents
             </Typography>
             {myAgents.length > 0 ? (
-                <AgentList agents={myAgents} onDeleteAgentConfig={handleDeleteAgentConfig} />
+                <AgentList agents={myAgents} onDeleteAgentConfig={handleDeleteAgentConfig} onCopyAgent={handleCopyAgent} onTogglePublic={handleTogglePublic} />
             ) : (
-                !error && !loading && (
+                !loading && !error && (
                     <Paper elevation={0} sx={{ p:3, textAlign: 'center', backgroundColor: 'action.hover' }}>
                         <Typography color="text.secondary">You haven't created any agents yet.</Typography>
                     </Paper>
@@ -241,9 +282,9 @@ const AgentsPage = () => {
                 Public Agents
             </Typography>
             {publicAgents.length > 0 ? (
-                <AgentList agents={publicAgents} onDeleteAgentConfig={handleDeleteAgentConfig} />
+                <AgentList agents={publicAgents} onDeleteAgentConfig={handleDeleteAgentConfig} onCopyAgent={handleCopyAgent} onTogglePublic={handleTogglePublic} />
             ) : (
-                !error && !loading && (
+                !loading && !error && (
                     <Paper elevation={0} sx={{ p:3, textAlign: 'center', backgroundColor: 'action.hover' }}>
                         <Typography color="text.secondary">No public agents available currently.</Typography>
                     </Paper>

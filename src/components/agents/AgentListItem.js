@@ -1,14 +1,13 @@
 // src/components/agents/AgentListItem.js
 import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { Card, CardContent, CardActions, Typography, Button, Chip, Box } from '@mui/material';
+import { Card, CardContent, CardActions, Typography, Button, Chip, Box, Switch, FormControlLabel } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
-import PublicIcon from '@mui/icons-material/Public'; // For Public Chip
 import { getPlatformById } from '../../constants/platformConstants';
 import { styled } from '@mui/material/styles';
-import { useAuth } from '../../contexts/AuthContext'; // To check ownership
+import { useAuth } from '../../contexts/AuthContext';
 
 const StyledCard = styled(Card)(({ theme }) => ({
     display: 'flex',
@@ -44,20 +43,20 @@ const canDeleteAgentConfig = (status, isOwnerOrAdmin, platform) => {
     return !status || !nonDeletableStatuses.includes(status);
 };
 
-const AgentListItem = ({ agent, onDeleteAgentConfig }) => {
+const AgentListItem = ({ agent, onDeleteAgentConfig, onCopyAgent, onTogglePublic }) => {
     const { currentUser } = useAuth();
     const platformInfo = agent.platform ? getPlatformById(agent.platform) : null;
 
     const isOwner = currentUser && agent.userId === currentUser.uid;
     const isAdmin = currentUser && currentUser.permissions?.isAdmin;
-    const canManage = isOwner || isAdmin; // For Edit/Delete
+    const canManage = isOwner || isAdmin;
 
     const showDeleteButton = canDeleteAgentConfig(agent.deploymentStatus, canManage, agent.platform);
 
     const getEditLink = () => {
         if (agent.platform === 'a2a') {
-                return `/agent/${agent.id}/edit-a2a`;
-            }
+            return `/agent/${agent.id}/edit-a2a`;
+        }
         return `/agent/${agent.id}/edit`;
     };
 
@@ -65,9 +64,25 @@ const AgentListItem = ({ agent, onDeleteAgentConfig }) => {
     return (
         <StyledCard>
             <CardContent>
-                <Typography variant="h5" component="h2" gutterBottom noWrap title={agent.name}>
-                    {agent.name}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Typography variant="h5" component="h2" gutterBottom noWrap title={agent.name} sx={{pr: 1, mb: 0}}>
+                        {agent.name}
+                    </Typography>
+                    {canManage && (
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={!!agent.isPublic}
+                                    onChange={(e) => onTogglePublic(agent, e.target.checked)}
+                                    size="small"
+                                />
+                            }
+                            label="Public"
+                            labelPlacement="start"
+                            sx={{ ml: 1, mr: -1.5, mt: -0.5, color: 'text.secondary', '& .MuiTypography-root': { fontSize: '0.8rem' } }}
+                        />
+                    )}
+                </Box>
                 <Box sx={{ mb: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
                     {agent.platform !== 'a2a' && (
                         <Chip
@@ -86,25 +101,15 @@ const AgentListItem = ({ agent, onDeleteAgentConfig }) => {
                             sx={{ lineHeight: '1.3' }}
                         />
                     )}
-                    {agent.isPublic && (
-                        <Chip
-                            icon={<PublicIcon fontSize="small"/>}
-                            label="Public"
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                            sx={{ lineHeight: '1.3' }}
-                        />
-                    )}
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Type: <Typography component="span" fontWeight="medium">{agent.agentType || 'Agent'}</Typography>
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5,  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={agent.litellm_model_string || agent.endpointUrl || 'N/A'}>
-                   {agent.platform === 'a2a' ? 'Endpoint: ' : 'Model: '}
-                   <Typography component="span" fontWeight="medium">
-                       {agent.platform === 'a2a' ? (agent.endpointUrl || 'N/A') : (agent.litellm_model_string || 'N/A (LiteLLM)')}
-                   </Typography>
+                    {agent.platform === 'a2a' ? 'Endpoint: ' : 'Model: '}
+                    <Typography component="span" fontWeight="medium">
+                        {agent.platform === 'a2a' ? (agent.endpointUrl || 'N/A') : (agent.litellm_model_string || 'N/A (LiteLLM)')}
+                    </Typography>
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{fontSize: '0.7rem'}}>
                     Owner: {agent.userId === currentUser?.uid ? "You" : agent.userId?.substring(0,8)+'...'}
@@ -119,7 +124,18 @@ const AgentListItem = ({ agent, onDeleteAgentConfig }) => {
             </CardContent>
             <CardActions sx={{ justifyContent: 'flex-end', pt: 0, px:2, pb:2, gap: 1 }}>
 
-                {canManage && ( // Only owner or admin can edit
+                {currentUser && onCopyAgent && (
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => onCopyAgent(agent)}
+                        startIcon={<ContentCopyIcon />}
+                    >
+                        Copy
+                    </Button>
+                )}
+
+                {canManage && (
                     <Button
                         size="small"
                         variant="outlined"
@@ -131,7 +147,7 @@ const AgentListItem = ({ agent, onDeleteAgentConfig }) => {
                         Edit
                     </Button>
                 )}
-                {showDeleteButton && onDeleteAgentConfig && canManage && ( // Ensure canManage for delete button
+                {showDeleteButton && onDeleteAgentConfig && canManage && (
                     <Button
                         size="small"
                         variant="outlined"

@@ -121,30 +121,54 @@ export const deleteModel = async (modelId) => {
 
 
 // --- Agents ---
-export const createAgentInFirestore = async (userId, agentData, isImport = false) => {
-    const dataToSave = {
-        userId,
-        ...agentData,
-        isPublic: false,
+export const createAgentInFirestore = async (currentUserId, agentData, isImportOrCopy = false) => {
+    // Start with a copy of the incoming data to avoid mutating the original object.
+    const sanitizedData = { ...agentData };
+
+    if (isImportOrCopy) {
+        // When copying or importing, strip all metadata that should be regenerated.
+        // This is crucial for security and data integrity.
+        delete sanitizedData.id; // Firestore will generate a new ID.
+        delete sanitizedData.userId; // The new owner will be the current user.
+        delete sanitizedData.createdAt;
+        delete sanitizedData.updatedAt;
+        delete sanitizedData.deploymentStatus;
+        delete sanitizedData.vertexAiResourceName;
+        delete sanitizedData.lastDeployedAt;
+        delete sanitizedData.lastDeploymentAttemptAt;
+        delete sanitizedData.deploymentError;
+        // API keys should never be carried over in a copy or import.
+        delete sanitizedData.litellm_api_key;
+        if (sanitizedData.childAgents && Array.isArray(sanitizedData.childAgents)) {
+            sanitizedData.childAgents = sanitizedData.childAgents.map(ca => {
+                const cleanChild = { ...ca };
+                delete cleanChild.litellm_api_key;
+                return cleanChild;
+            });
+        }
+    }
+
+    // Construct the final object for Firestore with correct ownership and fresh metadata.
+    const finalDataForFirestore = {
+        ...sanitizedData,
+        userId: currentUserId, // Explicitly set the owner to the current user.
+        isPublic: false,      // Copies/imports are private by default.
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     };
-    if (isImport) {
-        delete dataToSave.id;
-    }
-        // Add platform-specific initial state fields
-        if (agentData.platform === 'a2a') {
-            // A2A agents don't have vertex deployment status
-            dataToSave.deploymentStatus = 'n/a';
-        } else { // Default to google_vertex
-            dataToSave.platform = 'google_vertex';
-            dataToSave.deploymentStatus = "not_deployed";
-            dataToSave.vertexAiResourceName = null;
-            dataToSave.lastDeployedAt = null;
-            dataToSave.deploymentError = null;
+
+    // Reset deployment status for the new agent.
+    if (finalDataForFirestore.platform === 'a2a') {
+        finalDataForFirestore.deploymentStatus = 'n/a';
+    } else { // Default to google_vertex or keep the existing platform.
+        finalDataForFirestore.platform = finalDataForFirestore.platform || 'google_vertex';
+        finalDataForFirestore.deploymentStatus = "not_deployed";
+        finalDataForFirestore.vertexAiResourceName = null;
+        finalDataForFirestore.lastDeployedAt = null;
+        finalDataForFirestore.deploymentError = null;
     }
 
-    const docRef = await addDoc(collection(db, "agents"), dataToSave);
+    const docRef = await addDoc(collection(db, "agents"), finalDataForFirestore);
     return docRef.id;
 };
 
