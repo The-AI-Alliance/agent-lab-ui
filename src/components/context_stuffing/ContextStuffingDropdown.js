@@ -7,6 +7,7 @@ const ContextStuffingDropdown = ({ onOptionSelected, disabled }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
 
+
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
     };
@@ -48,6 +49,7 @@ const ContextStuffingDropdown = ({ onOptionSelected, disabled }) => {
                 <MenuItem onClick={() => handleSelect('webpage')}>Web Page (Raw)</MenuItem>
                 <MenuItem onClick={() => handleSelect('gitrepo')}>Git Repository</MenuItem>
                 <MenuItem onClick={() => handleSelect('pdf')}>PDF Document</MenuItem>
+                <MenuItem onClick={() => handleSelect('image')}>Image</MenuItem>
             </Menu>
         </div>
     );

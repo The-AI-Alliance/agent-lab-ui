@@ -37,10 +37,23 @@ const ContextDetailsDialog = ({ open, onClose, contextItems }) => {
                     <Accordion key={item.name + index} sx={{ mb: 1 }} TransitionProps={{ unmountOnExit: true }}>
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                             <DescriptionIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                            <Typography sx={{ width: '60%', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.name}>
-                                {item.name}
+                             <Typography
+                                sx={{
+                                    width: { xs: '40%', sm: '60%' },
+                                    flexShrink: 0,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                }}
+                                title={item.name}
+                            >
+                            {item.name}
                             </Typography>
-                            <Chip label={item.type.toUpperCase()} size="small" variant="outlined" sx={{ mx: 1 }} />
+                             <Chip
+                                label={item.type?.toUpperCase() || 'UNKNOWN'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ mx: 1 }} />
                             <Typography sx={{ color: 'text.secondary', ml: 'auto' }}>
                                 {formatBytes(item.bytes || item.content?.length || 0)}
                             </Typography>
@@ -48,7 +61,6 @@ const ContextDetailsDialog = ({ open, onClose, contextItems }) => {
                         <AccordionDetails sx={{ bgcolor: 'background.default', borderTop: '1px solid', borderColor: 'divider' }}>
                             <Typography
                                 component="pre"
-                                variant="body2"
                                 sx={{
                                     whiteSpace: 'pre-wrap',
                                     wordBreak: 'break-all',
@@ -57,11 +69,22 @@ const ContextDetailsDialog = ({ open, onClose, contextItems }) => {
                                     bgcolor: 'action.hover',
                                     p: 1.5,
                                     borderRadius: 1,
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.8rem'
+                                    fontFamily: item.type === 'image' ? 'inherit' : 'monospace',
+                                    fontSize: '0.8rem',
+                                    '& img': { // Style for images within the pre tag
+                                        maxWidth: '100%',
+                                        height: 'auto',
+                                        borderRadius: 1,
+                                    }
                                 }}
                             >
-                                {item.content || "Content not available or empty."}
+                                 {item.type === 'image' && item.signedUrl ? (
+                                    <img src={item.signedUrl} alt={item.name || 'context image'} />
+                                ) : (
+                                    <Typography component="span" variant="body2">
+                                            {item.content || "Content not available or empty."}
+                                        </Typography>
+                                )}
                             </Typography>
                         </AccordionDetails>
                     </Accordion>

@@ -10,7 +10,8 @@ const ContextDisplayBubble = ({ contextMessage, onOpenDetails }) => {
 
     if (itemCount === 1 && contextMessage.items[0]) {
         const item = contextMessage.items[0];
-        summaryText = `Context Added: "${item.name}" (${item.type})`;
+        const itemTypeDisplay = item.type?.replace(/_/g, ' ') || 'item';
+        summaryText = `Context Added: "${item.name}" (${itemTypeDisplay})`;
     }
 
 

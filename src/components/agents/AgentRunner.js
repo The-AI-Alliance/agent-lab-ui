@@ -27,10 +27,11 @@ import ContextStuffingDropdown from '../context_stuffing/ContextStuffingDropdown
 import WebPageContextModal from '../context_stuffing/WebPageContextModal';
 import GitRepoContextModal from '../context_stuffing/GitRepoContextModal';
 import PdfContextModal from '../context_stuffing/PdfContextModal';
+import ImageContextModal from '../components/context_stuffing/ImageContextModal';
 import ContextDisplayBubble from '../context_stuffing/ContextDisplayBubble';
 import ContextDetailsDialog from '../context_stuffing/ContextDetailsDialog';
 
-import { fetchWebPageContent, fetchGitRepoContents, processPdfContent } from '../../services/contextService';
+import { fetchWebPageContent, fetchGitRepoContents, processPdfContent, uploadImageForContext } from '../../services/contextService';
 
 
 // Helper function to extract artifact updates
@@ -193,7 +194,8 @@ const AgentRunner = ({
                 if (result.success) {
                     newContextItems.push({ name: result.name, content: result.content, type: 'webpage', bytes: result.content?.length || 0 });
                 } else { throw new Error(result.message || "Failed to fetch web page."); }
-            } else if (params.type === 'gitrepo') {
+            }
+            else if (params.type === 'gitrepo') {
                 const result = await fetchGitRepoContents(params);
                 if (result.success && result.items) {
                     newContextItems = result.items.map(item => ({ name: item.name, content: item.content, type: item.type, bytes: item.content?.length || 0 }));
@@ -203,9 +205,23 @@ const AgentRunner = ({
                 if (result.success) {
                     newContextItems.push({ name: result.name, content: result.content, type: result.type, bytes: result.content?.length || 0 });
                 } else { throw new Error(result.message || "Failed to process PDF."); }
+            } else if (params.type === 'image') {
+                const result = await uploadImageForContext(params.file);
+                if (result.success) {
+                    newContextItems.push({
+                        name: result.name,
+                        type: 'image',
+                        bytes: params.file.size,
+                        storageUrl: result.storageUrl,
+                        signedUrl: result.signedUrl,
+                        mimeType: params.file.type
+                    });
+                } else {
+                    throw new Error(result.message || "Failed to upload image.");
+                }
             }
 
-            const validContextItems = newContextItems.filter(item => item.type !== 'gitfile_error' && item.type !== 'gitfile_skipped' && item.type !== 'pdf_error');
+                const validContextItems = newContextItems.filter(item => item.type !== 'gitfile_error' && item.type !== 'gitfile_skipped' && item.type !== 'pdf_error');
             const errorContextItems = newContextItems.filter(item => item.type === 'gitfile_error' || item.type === 'gitfile_skipped' || item.type === 'pdf_error');
 
             if (validContextItems.length > 0) {
@@ -474,6 +490,7 @@ const AgentRunner = ({
             {isContextModalOpen && contextModalType === 'webpage' && ( <WebPageContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             {isContextModalOpen && contextModalType === 'gitrepo' && ( <GitRepoContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             {isContextModalOpen && contextModalType === 'pdf' && ( <PdfContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
+            {isContextModalOpen && contextModalType === 'image' && ( <ImageContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             <ContextDetailsDialog open={isContextDetailsOpen} onClose={handleCloseContextDetails} contextItems={selectedContextItemsForDetails} />
         </Paper>
     );

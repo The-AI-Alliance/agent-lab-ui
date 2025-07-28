@@ -26,6 +26,7 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
     adk_user_id = data.get("adkUserId")
     chat_id = data.get("chatId")
     parent_message_id = data.get("parentMessageId") # Can be null
+    stuffed_context_items = data.get("stuffedContextItems")
     firebase_auth_uid = req.auth.uid if req.auth else "unknown_firebase_auth_uid"
 
     if not chat_id or not adk_user_id:
@@ -44,14 +45,21 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
 
     effective_parent_id = parent_message_id
 
-    # 1. If there's message content, create a new user message.
-    #    This is the core of the fix: this block is skipped for "Reply as..." actions.
-    if message_text and message_text.strip():
+    # 1. If there's message content or context items, create a new user message.
+    if (message_text and message_text.strip()) or (stuffed_context_items and isinstance(stuffed_context_items, list)):
         user_message_ref = messages_col_ref.document()
         user_message_id = user_message_ref.id
+        # Build the parts for the user message
+        user_message_parts = []
+        if message_text and message_text.strip():
+            user_message_parts.append({"type": "text", "content": message_text})
+        if stuffed_context_items:
+            # For now, just add a text representation of context. The full items are passed to the task.
+            user_message_parts.append({"type": "text", "content": f"[{len(stuffed_context_items)} context item(s) provided.]"})
+
         user_message_data = {
             "id": user_message_id,
-            "content": message_text,
+            "parts": user_message_parts, # Store as parts
             "participant": f"user:{firebase_auth_uid}",
             "parentMessageId": parent_message_id,
             "childMessageIds": [], # Will be linked to the new assistant message
@@ -78,6 +86,7 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
         "participant": participant_id,
         "parentMessageId": effective_parent_id,
         "childMessageIds": [],
+        "stuffedContextItems": stuffed_context_items,
         "timestamp": firestore.SERVER_TIMESTAMP,
         "run": {
             "status": "pending",
@@ -109,6 +118,7 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
             "agentId": agent_id,
             "modelId": model_id,
             "adkUserId": adk_user_id,
+            "stuffedContextItems": stuffed_context_items,
         }
 
         task = {

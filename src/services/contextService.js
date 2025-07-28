@@ -2,6 +2,7 @@
 import { createCallable } from '../firebaseConfig';
 
 const fetchWebPageContentCallable = createCallable('fetch_web_page_content');
+const uploadImageForContextCallable = createCallable('uploadImageForContext');
 const fetchGitRepoContentsCallable = createCallable('fetch_git_repo_contents');
 const processPdfContentCallable = createCallable('process_pdf_content');
 
@@ -33,4 +34,30 @@ export const processPdfContent = async ({ url, fileData, fileName }) => { // fil
         console.error("Error calling processPdfContent callable:", error);
         throw error;
     }
+};
+
+export const uploadImageForContext = (file) => {
+    return new Promise((resolve, reject) => {
+            if (!file) {
+                    return reject(new Error("File is required."));
+                }
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                    try {
+                            // result is "data:image/jpeg;base64,..."
+                                // We only need the part after the comma
+                                    const base64Data = reader.result.split(',')[1];
+                            const result = await uploadImageForContextCallable({
+                                    fileData: base64Data,
+                                    fileName: file.name,
+                                    mimeType: file.type,
+                                });
+                            resolve(result.data); // Expected: { success, name, storageUrl, signedUrl }
+                        } catch (error) {
+                            reject(error);
+                        }
+                };
+            reader.onerror = error => reject(error);
+        });
 };

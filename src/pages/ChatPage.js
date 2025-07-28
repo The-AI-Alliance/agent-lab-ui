@@ -36,11 +36,12 @@ import { muiMarkdownComponentsConfig } from '../components/common/MuiMarkdownCom
 // Context Stuffing Imports
 import WebPageContextModal from '../components/context_stuffing/WebPageContextModal';
 import GitRepoContextModal from '../components/context_stuffing/GitRepoContextModal';
+import ImageContextModal from '../components/context_stuffing/ImageContextModal'; // New Import
 import PdfContextModal from '../components/context_stuffing/PdfContextModal';
 import ContextDisplayBubble from '../components/context_stuffing/ContextDisplayBubble';
 import ContextDetailsDialog from '../components/context_stuffing/ContextDetailsDialog';
 import DatasetLinkedIcon from '@mui/icons-material/DatasetLinked';
-import { fetchWebPageContent, fetchGitRepoContents, processPdfContent } from '../services/contextService';
+import { fetchWebPageContent, fetchGitRepoContents, processPdfContent, uploadImageForContext } from '../services/contextService';
 
 
 // Helper for user-friendly participant display (user, agent, or model)
@@ -199,7 +200,7 @@ const ChatPage = () => {
         if (type === 'text' || type === 'agent' || type === 'model') {
             setComposerAction({ type, id, name });
         } else if (type.startsWith('context-')) {
-            const contextType = type.split('-')[1]; // 'webpage', 'gitrepo', 'pdf'
+            const contextType = type.split('-')[1]; // 'webpage', 'gitrepo', 'pdf', 'image'
             setContextModalType(contextType);
             setIsContextModalOpen(true);
         }
@@ -215,7 +216,7 @@ const ChatPage = () => {
                 if (!composerValue.trim()) return;
                 await addChatMessage(chatId, {
                     participant: `user:${currentUser.uid}`,
-                    content: composerValue,
+                    parts: [{ type: 'text', content: composerValue }],
                     parentMessageId: activeLeafMsgId
                 });
                 setComposerValue('');
@@ -281,6 +282,11 @@ const ChatPage = () => {
                 if (result.success) {
                     newContextItems.push({ name: result.name, content: result.content, type: result.type, bytes: result.content?.length || 0 });
                 } else { throw new Error(result.message || "Failed to process PDF."); }
+            } else if (params.type === 'image') {
+                const result = await uploadImageForContext(params.file);
+                if (result.success) {
+                    newContextItems.push({ name: result.name, type: 'image', storageUrl: result.storageUrl, signedUrl: result.signedUrl, mimeType: params.file.type });
+                } else { throw new Error(result.message || "Failed to upload image."); }
             }
 
             const validContextItems = newContextItems.filter(item => item.type !== 'gitfile_error' && item.type !== 'gitfile_skipped' && item.type !== 'pdf_error');
@@ -289,14 +295,19 @@ const ChatPage = () => {
             if (validContextItems.length > 0) {
                 await addChatMessage(chatId, {
                     participant: 'context_stuffed',
-                    content: `Context added: ${validContextItems.length} item(s).`,
+                    parts: validContextItems.map(item => ({
+                        type: item.type,
+                        name: item.name,
+                        ...(item.content && { content: item.content }), // For text-based context
+                        ...(item.storageUrl && { storageUrl: item.storageUrl, signedUrl: item.signedUrl, mimeType: item.mimeType }), // For images
+                    })),
                     contextItems: validContextItems,
                     parentMessageId: activeLeafMsgId
                 });
             }
             if (errorContextItems.length > 0) {
                 const errorContent = errorContextItems.map(err => `Context Fetch Error for "${err.name}": ${err.content}`).join('\n');
-                await addChatMessage(chatId, { participant: `user:${currentUser.uid}`, content: errorContent, parentMessageId: activeLeafMsgId});
+                await addChatMessage(chatId, { participant: `user:${currentUser.uid}`, parts: [{ type: 'text', content: errorContent }], parentMessageId: activeLeafMsgId});
             }
         } catch (err) {
             setError(`Failed to stuff context: ${err.message}`);
@@ -331,6 +342,7 @@ const ChatPage = () => {
                             );
                         }
                         const participant = parseParticipant(msg.participant, models, agents, [], currentUser);
+                        const messageParts = msg.parts || (msg.content ? [{ type: 'text', content: msg.content }] : []);
                         return (
                             <Box key={msg.id} sx={{ position: 'relative', mb: 1 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -339,10 +351,24 @@ const ChatPage = () => {
                                 </Box>
                                 <Paper variant="outlined" sx={{ p: 1.5, wordBreak: 'break-word', whiteSpace: 'pre-wrap', mb: 0.5,
                                     bgcolor: msg.participant?.startsWith('user') ? 'primary.light' : msg.participant?.startsWith('agent') ? 'grey.100' : 'secondary.light' }}>
-                                    {msg.content ? (
-                                        <ReactMarkdown components={muiMarkdownComponentsConfig} remarkPlugins={[remarkGfm]}>
-                                            {msg.content}
-                                        </ReactMarkdown>
+                                    {messageParts.length > 0 ? (
+                                        messageParts.map((part, index) => {
+                                            if (part.type === 'text') {
+                                                return (
+                                                    <ReactMarkdown key={index} components={muiMarkdownComponentsConfig} remarkPlugins={[remarkGfm]}>
+                                                        {part.content}
+                                                    </ReactMarkdown>
+                                                );
+                                            }
+                                            if (part.type === 'image' && part.signedUrl) {
+                                                return (
+                                                    <Box key={index} sx={{ my: 1, maxWidth: '300px' }}>
+                                                        <img src={part.signedUrl} alt={part.name || 'uploaded image'} style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }} />
+                                                    </Box>
+                                                );
+                                            }
+                                            return null;
+                                        })
                                     ) : (
                                         <Typography variant="body1" sx={{ color: "text.secondary" }}>(no content)</Typography>
                                     )}
@@ -429,6 +455,7 @@ const ChatPage = () => {
                         <MenuItem onClick={() => handleMenuActionSelect({ type: 'context-webpage' })}>Web Page</MenuItem>
                         <MenuItem onClick={() => handleMenuActionSelect({ type: 'context-gitrepo' })}>Git Repository</MenuItem>
                         <MenuItem onClick={() => handleMenuActionSelect({ type: 'context-pdf' })}>PDF Document</MenuItem>
+                        <MenuItem onClick={() => handleMenuActionSelect({ type: 'context-image' })}>Image</MenuItem>
                     </Menu>
                 </Box>
             </Paper>
@@ -441,6 +468,7 @@ const ChatPage = () => {
             {isContextModalOpen && contextModalType === 'webpage' && ( <WebPageContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             {isContextModalOpen && contextModalType === 'gitrepo' && ( <GitRepoContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             {isContextModalOpen && contextModalType === 'pdf' && ( <PdfContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
+            {isContextModalOpen && contextModalType === 'image' && ( <ImageContextModal open={isContextModalOpen} onClose={handleCloseContextModal} onSubmit={handleContextSubmit} /> )}
             <ContextDetailsDialog open={isContextDetailsOpen} onClose={handleCloseContextDetails} contextItems={selectedContextItemsForDetails} />
 
         </Container>

@@ -5,6 +5,7 @@ import json
 import uuid  # Import uuid to generate message IDs
 from datetime import datetime, timezone
 from google.cloud import tasks_v2
+from google.cloud import storage
 
 from firebase_admin import firestore
 from firebase_functions import https_fn
@@ -12,7 +13,7 @@ from firebase_functions import https_fn
 from common.core import db, logger
 from common.config import get_gcp_project_config
 from common.utils import initialize_vertex_ai
-from common.adk_helpers import instantiate_adk_agent_from_config
+from common.adk_helpers import instantiate_adk_agent_from_config, get_adk_artifact_service
 
 # NEW import for A2A client logic
 import httpx
@@ -26,8 +27,10 @@ from .query_vertex_runner import run_vertex_stream_query
 from .query_local_diagnostics import try_local_diagnostic_run
 from vertexai.agent_engines import get as get_engine
 from google.adk.sessions import VertexAiSessionService
+from google.genai.types import Content, Part
 
 
+storage_client = storage.Client()
 
 
 async def get_full_message_history(chat_id, leaf_message_id):
@@ -272,7 +275,8 @@ async def _execute_and_stream_to_firestore(
         assistant_message_id: str,
         agent_id: str | None,
         model_id: str | None,
-        adk_user_id: str
+        adk_user_id: str,
+        stuffed_context_items: list | None = None
 ):
     """
     Orchestrates querying a deployed Vertex AI agent OR a model OR an A2A agent, streaming events to Firestore.
@@ -291,9 +295,34 @@ async def _execute_and_stream_to_firestore(
     else:
         conversation_history = await get_full_message_history(chat_id, parent_message_id)
 
-        # Format for ADK: combine all messages into one string
-    # A more sophisticated approach might use structured input later
-    full_message_text = "\n\n".join([msg.get("content", "") for msg in conversation_history])
+        # This will now be a list of parts (text and images)
+    multimodal_parts = []
+
+    # Process historical messages
+    for msg in conversation_history:
+        for part in msg.get("parts", []):
+            if part.get("type") == "text":
+                multimodal_parts.append({"type": "text", "data": part["content"]})
+            elif part.get("type") == "image" and part.get("storageUrl"):
+                multimodal_parts.append({
+                    "type": "image",
+                    "gs_uri": part.get("storageUrl"),
+                    "public_url": part.get("signedUrl"), # It's a public url, but key name is fine
+                    "mimeType": part.get("mimeType", "image/jpeg")
+                })
+
+                # Process context items stuffed in the current turn
+    if stuffed_context_items:
+        for item in stuffed_context_items:
+            if item.get("type") == "image" and item.get("storageUrl"):
+                multimodal_parts.append({
+                    "type": "image",
+                    "gs_uri": item.get("storageUrl"),
+                    "public_url": item.get("signedUrl"),
+                    "mimeType": item.get("mimeType", "image/jpeg")
+                })
+            elif item.get("content"): # For text-based context
+                multimodal_parts.append({"type": "text", "data": f"CONTEXT:\n---\n{item['name']}\n{item['content']}\n---\n"})
 
     logger.info(f"[TaskExecutor] Initiating query for assistant message: {assistant_message_id}.")
 
@@ -333,19 +362,54 @@ async def _execute_and_stream_to_firestore(
         if not resource_name or participant_config.get("deploymentStatus") != "deployed":
             raise ValueError(f"Agent {agent_id} is not successfully deployed.")
 
+            # For Vertex, we set up a runner with a session and artifact service
+        from google.adk.runners import Runner
+
         session_service = VertexAiSessionService(project=project_id, location=location)
-        current_adk_session_id, session_errors = await ensure_adk_session(
-            session_service, resource_name, adk_user_id, session_id_from_client=None # Sessions are managed by chat now
+        artifact_service = await get_adk_artifact_service()
+
+        remote_app_runner = Runner(
+            agent=get_engine(resource_name),
+            app_name=resource_name,
+            session_service=session_service,
+            artifact_service=artifact_service
         )
 
-        if not current_adk_session_id:
-            raise ValueError(f"Failed to establish ADK session: {session_errors}")
+        session = await remote_app_runner.session_service.create_session(app_name=resource_name, user_id=adk_user_id)
+        current_adk_session_id = session.id
 
-        remote_app = get_engine(resource_name)
+        # Construct multimodal input for the ADK
+        adk_parts = []
+        for part_data in multimodal_parts:
+            if part_data["type"] == "text":
+                adk_parts.append(Part.from_text(text= part_data["data"]))
+            elif part_data["type"] == "image":
+                gs_uri = part_data["gs_uri"]
+                bucket_name = gs_uri.split('/')[2]
+                blob_name = '/'.join(gs_uri.split('/')[3:])
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(blob_name)
+                image_bytes = blob.download_as_bytes()
+                mime_type = part_data.get("mimeType", "image/jpeg")
+                adk_parts.append(Part.from_data(data=image_bytes, mime_type=mime_type))
 
-        final_text, errors, had_exceptions, num_events = await run_vertex_stream_query(
-            remote_app, full_message_text, adk_user_id, current_adk_session_id, assistant_message_ref
-        )
+        new_message_content = Content(parts=adk_parts, role="user")
+
+        final_text = ""
+        errors = []
+        try:
+            async for event_obj in remote_app_runner.run_async(user_id=adk_user_id, session_id=current_adk_session_id, new_message=new_message_content):
+                event_dict = event_obj.model_dump()
+                assistant_message_ref.update({"run.outputEvents": firestore.ArrayUnion([event_dict])})
+                content = event_dict.get("content", {})
+                if content and content.get("parts"):
+                    for part in content["parts"]:
+                        if "text" in part:
+                            final_text += part["text"]
+        except Exception as e_run:
+            logger.error(f"Error during Vertex ADK run: {e_run}", exc_info=True)
+            errors.append(f"ADK runner failed: {str(e_run)}")
+
         return {"finalResponseText": final_text, "queryErrorDetails": errors}
 
     elif model_id:
@@ -369,17 +433,47 @@ async def _execute_and_stream_to_firestore(
         from google.adk.sessions import InMemorySessionService
         from google.adk.artifacts import InMemoryArtifactService
         from google.adk.memory import InMemoryMemoryService
-        from google.genai.types import Content, Part
+
+        # Construct multimodal input for LiteLLM
+        litellm_content = []
+        full_message_text_for_model = ""
+        for part_data in multimodal_parts:
+            if part_data["type"] == "text":
+                # For LiteLLM, we can aggregate text into a single part or multiple
+                full_message_text_for_model += part_data["data"] + "\n"
+            elif part_data["type"] == "image":
+                public_url = part_data.get("public_url")
+                logger.info("Public URL for image part: %s", public_url)
+                if not public_url:
+                    # This is the critical change. We no longer try to sign here.
+                    # We raise an error if the public URL is missing.
+                    error_msg = f"Image part is missing its public URL for LiteLLM call. Stored gs_uri was {part_data.get('gs_uri')}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+                litellm_content.append({"type": "image_url", "image_url": {"url": public_url}})
+
+                # Prepend text content to the list
+        if full_message_text_for_model.strip():
+            litellm_content.insert(0, {"type": "text", "text": full_message_text_for_model.strip()})
+
+            # This is a workaround to pass the complex structure to the ADK's LiteLLM wrapper.
+        # We pass a special JSON string that the LiteLLM model class in adk_helpers will be adapted to parse.
+        # If no images, we pass a simple text string.
+        if any(p['type'] == 'image_url' for p in litellm_content):
+            # This indicates to the underlying model wrapper to use the multimodal format.
+            message_content_for_runner = Content(role="user", parts=[Part.from_text(
+                text= json.dumps({"multimodal_content": litellm_content}))
+            ])
+        else:
+            message_content_for_runner = Content(role="user", parts=[Part.from_text(text = full_message_text_for_model)])
 
         runner = Runner(agent=local_adk_agent, app_name=local_adk_agent.name, session_service=InMemorySessionService(), artifact_service=InMemoryArtifactService(), memory_service=InMemoryMemoryService())
         session = await runner.session_service.create_session(app_name=runner.app_name, user_id=adk_user_id)
 
-        message_content = Content(role="user", parts=[Part(text=full_message_text)])
-
         final_text = ""
         errors = []
         try:
-            async for event_obj in runner.run_async(user_id=adk_user_id, session_id=session.id, new_message=message_content):
+            async for event_obj in runner.run_async(user_id=adk_user_id, session_id=session.id, new_message=message_content_for_runner):
                 event_dict = event_obj.model_dump()
                 # Stream events to Firestore for live UI updates
                 assistant_message_ref.update({"run.outputEvents": firestore.ArrayUnion([event_dict])})
@@ -403,6 +497,7 @@ async def _run_agent_task_logic(data: dict):
     agent_id = data.get("agentId")
     model_id = data.get("modelId")
     adk_user_id = data.get("adkUserId")
+    stuffed_context_items = data.get("stuffedContextItems")
 
     logger.info(f"[TaskHandler] Starting execution for message: {assistant_message_id}")
     assistant_message_ref = db.collection("chats").document(chat_id).collection("messages").document(assistant_message_id)
@@ -415,7 +510,8 @@ async def _run_agent_task_logic(data: dict):
             assistant_message_id=assistant_message_id,
             agent_id=agent_id,
             model_id=model_id,
-            adk_user_id=adk_user_id
+            adk_user_id=adk_user_id,
+            stuffed_context_items=stuffed_context_items
         )
 
         final_update_payload = {

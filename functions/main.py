@@ -19,7 +19,8 @@ from handlers.gofannon_handler import _get_gofannon_tool_manifest_logic
 from handlers.context_handler import (
     _fetch_web_page_content_logic,
     _fetch_git_repo_contents_logic,
-    _process_pdf_content_logic
+    _process_pdf_content_logic,
+    _upload_image_and_get_uri_logic
 )
 from handlers.mcp_handler import _list_mcp_server_tools_logic_async
 from handlers.a2a_handler import _fetch_a2a_agent_card_logic_async
@@ -78,7 +79,11 @@ def fetch_git_repo_contents(req: https_fn.CallableRequest):
 def process_pdf_content(req: https_fn.CallableRequest):
     return _process_pdf_content_logic(req)
 
-# New Function for MCP Tools
+@https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120)
+@handle_exceptions_and_log
+def uploadImageForContext(req: https_fn.CallableRequest):
+    return _upload_image_and_get_uri_logic(req)
+
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120) # Increased timeout for potential network calls
 @handle_exceptions_and_log
 def list_mcp_server_tools(req: https_fn.CallableRequest):

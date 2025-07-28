@@ -3,6 +3,7 @@ firebase-admin
 google-cloud-aiplatform[adk,agent_engines]==1.98.0
 google-adk>=1.4.2
 google-cloud-tasks>=2.15.0
+google-cloud-storage>=2.0.0
 gofannon
 requests # For fetching Gofannon manifest
 google-cloud-logging>=3.0.0

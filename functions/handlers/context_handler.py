@@ -1,12 +1,16 @@
 # functions/handlers/context_handler.py
 import os
 import base64
+import uuid
 import requests
+from datetime import timedelta
+from google.cloud import storage
 import io # For PyPDF2 with in-memory bytes
 from pypdf import PdfReader
 # from bs4 import BeautifulSoup # Optional: for cleaner web text
 from firebase_functions import https_fn, options
 from common.core import logger # Assuming your logger setup
+from google.cloud.exceptions import NotFound
 
 # --- Web Page Fetching ---
 def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
@@ -42,7 +46,7 @@ def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="An unexpected error occurred.")
 
 
-    # --- Git Repository Fetching ---
+        # --- Git Repository Fetching ---
 GITHUB_API_BASE = "https://api.github.com"
 
 def get_github_token():
@@ -328,4 +332,104 @@ def _process_pdf_content_logic(req: https_fn.CallableRequest):
             return {"success": True, "name": pdf_source_name, "content": "[PDF is encrypted and cannot be processed]", "type": "pdf_error"}
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to process PDF: {str(e)}")
 
-__all__ = ['_fetch_web_page_content_logic', '_fetch_git_repo_contents_logic', '_process_pdf_content_logic']
+
+    # --- Image Upload ---
+def _upload_image_and_get_uri_logic(req: https_fn.CallableRequest):
+    from common.config import get_gcp_project_config
+
+    if not req.auth:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
+
+    data = req.data
+    file_data_base64 = data.get("fileData")
+    file_name = data.get("fileName")
+    mime_type = data.get("mimeType")
+    user_id = req.auth.uid
+
+    if not all([file_data_base64, file_name, mime_type, user_id]):
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Missing required fields: fileData, fileName, mimeType.")
+
+    try:
+        # Decode the base64 string to bytes
+        image_bytes = base64.b64decode(file_data_base64)
+
+        # Get project config to determine bucket name
+        project_id, _, _ = get_gcp_project_config()
+        bucket_name = f"{project_id}-context-uploads"
+
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+
+        if bucket.exists():
+            # Bucket exists, we MUST check its configuration.
+            bucket.reload() # Get the latest metadata, including IAM config
+            if bucket.iam_configuration.uniform_bucket_level_access_enabled:
+                # This is the error condition. The bucket is misconfigured.
+                error_message = (
+                    f"The storage bucket '{bucket_name}' is configured with Uniform access. "
+                    "It must be set to Fine-grained to allow making individual images public. "
+                    "Please go to the Google Cloud Console, navigate to the bucket's 'Permissions' tab, "
+                    "and switch Access Control to 'Fine-grained'."
+                )
+                logger.error(error_message)
+                raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION, message=error_message)
+        else:
+            # Bucket does not exist, create it with the CORRECT setting.
+            logger.warning(f"Storage bucket '{bucket_name}' not found. Attempting to create it now with Fine-grained access.")
+            bucket_to_create = storage_client.bucket(bucket_name)
+            bucket_to_create.iam_configuration.uniform_bucket_level_access_enabled = False # Set before creation
+            location = os.environ.get("FUNCTION_REGION", "us-central1")
+            bucket = storage_client.create_bucket(bucket_to_create, location=location)
+            logger.info(f"Successfully created bucket '{bucket_name}' with Fine-grained access control.")
+
+
+            # Create a unique path for the file in Cloud Storage
+        # Path: users/{user_id}/images/{uuid}_{filename}
+        _, file_extension = os.path.splitext(file_name)
+        unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+        blob_path = f"users/{user_id}/images/{unique_filename}"
+
+        blob = bucket.blob(blob_path)
+        blob.upload_from_string(image_bytes, content_type=mime_type)
+
+        # TODO: Revert to the more secure signed URL method.
+        # This current implementation makes all uploaded images public.
+        # To fix this:
+        # 1. In the Google Cloud Console, go to IAM & Admin > IAM.
+        # 2. Find the service account for your Cloud Functions (e.g., your-project-id@appspot.gserviceaccount.com).
+        # 3. Grant it the "Service Account Token Creator" role.
+        # 4. Replace the code below with the commented-out "Secure Method" block.
+        # 5. Import `from google.auth import compute_engine` at the top of the file.
+
+        # --- Insecure Method (Current) ---
+        blob.make_public()
+        public_url = blob.public_url
+        logger.info(f"Successfully uploaded image for user {user_id} and made it public.")
+        final_url_for_client = public_url
+        # ---------------------------------
+
+
+        # --- Secure Method (Commented Out) ---
+        # from google.auth import compute_engine
+        # credentials = compute_engine.Credentials()
+        # service_account_email = credentials.service_account_email
+        # signed_url = blob.generate_signed_url(
+        #     version="v4",
+        #     expiration=timedelta(minutes=15),
+        #     method="GET",
+        #     service_account_email=service_account_email,
+        #     access_token=credentials.token
+        # )
+        # final_url_for_client = signed_url
+        # -----------------------------------
+
+        # The gs:// URI is the persistent identifier for backend processing
+        storage_uri = f"gs://{bucket.name}/{blob.name}"
+
+        return {"success": True, "name": file_name, "storageUrl": storage_uri, "signedUrl": final_url_for_client}
+
+    except Exception as e:
+        logger.error(f"Error during image upload for user {user_id}: {e}", exc_info=True)
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="Failed to upload image.")
+
+__all__ = ['_fetch_web_page_content_logic', '_fetch_git_repo_contents_logic', '_process_pdf_content_logic', '_upload_image_and_get_uri_logic']
