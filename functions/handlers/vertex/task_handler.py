@@ -465,11 +465,6 @@ async def _execute_and_stream_to_firestore(
             logger.error(f"Error during Vertex ADK run: {e_run}", exc_info=True)
             errors.append(f"ADK runner failed: {str(e_run)}")
 
-
-        final_text, errors, had_exceptions, num_events = await run_vertex_stream_query(
-            remote_app, final_message_for_agent, adk_user_id, current_adk_session_id, assistant_message_ref
-        )
-
         return {"finalResponseText": final_text, "queryErrorDetails": errors}
 
     elif model_id:
@@ -523,7 +518,7 @@ async def _execute_and_stream_to_firestore(
             ])
         else:
             message_content_for_runner = Content(role="user", parts=[Part.from_text(text = full_message_text_for_model)])
->>>>>>> 8aa4c4ad (Image upload to context works)
+
 
         # Construct multimodal input for LiteLLM
         litellm_content = []
@@ -565,6 +560,7 @@ async def _execute_and_stream_to_firestore(
 
         final_text = ""
         errors = []
+
         try:
             async for event_obj in runner.run_async(user_id=adk_user_id, session_id=session.id, new_message=message_content_for_runner):
                 event_dict = event_obj.model_dump()

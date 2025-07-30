@@ -10,6 +10,7 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true,
         liteLlmModelPrefix: "openai",
         models: [
+            { id: "gpt-4.1-nano-2025-04-14", name: "GPT-4.1 Nano (2025-04-14)", supportedModes: ['text', 'image'] },
             { id: "gpt-4o", name: "GPT-4o (Omni)", supportedModes: ['text', 'image'] },
             { id: "gpt-4-turbo", name: "GPT-4 Turbo", supportedModes: ['text', 'image'] },
             { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", supportedModes: ['text'] },
