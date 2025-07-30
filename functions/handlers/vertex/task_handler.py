@@ -356,7 +356,8 @@ async def _execute_and_stream_to_firestore(
         # Construct the message content for the A2A agent, including context
         last_user_message = next((msg for msg in reversed(conversation_history) if msg.get("participant", "").startswith("user:")), None)
         user_message_content = last_user_message.get("content", "") if last_user_message else ""
-        final_a2a_message_content = (context_string_prefix + user_message_content).strip()
+        # final_a2a_message_content = (context_string_prefix + user_message_content).strip()
+        final_a2a_message_content = user_message_content.strip()
 
         agent_capabilities = participant_config.get("agentCard", {}).get("capabilities", {})
         is_streaming = agent_capabilities.get("streaming", False)
@@ -369,8 +370,8 @@ async def _execute_and_stream_to_firestore(
             return await _run_a2a_agent_unary(participant_config, final_a2a_message_content, assistant_message_ref)
 
             # For Vertex and Model runs, combine the full history with the context
-    full_message_text = "\n\n".join([msg.get("content", "") for msg in conversation_history if msg.get("content")])
-    final_message_for_agent = (context_string_prefix + full_message_text).strip()
+    # full_message_text = "\n\n".join([msg.get("content", "") for msg in conversation_history if msg.get("content")])
+    # final_message_for_agent = (context_string_prefix + full_message_text).strip()
 
     if agent_id: # Defaults to google_vertex
         resource_name = participant_config.get("vertexAiResourceName")
@@ -486,83 +487,51 @@ async def _execute_and_stream_to_firestore(
         from google.adk.artifacts import InMemoryArtifactService
         from google.adk.memory import InMemoryMemoryService
 
-        # Construct multimodal input for LiteLLM
-        litellm_content = []
-        full_message_text_for_model = ""
+        # --- Build multimodal Content(parts) using ADK artifact conventions ---
+        adk_parts = []
         for part_data in multimodal_parts:
             if part_data["type"] == "text":
-                # For LiteLLM, we can aggregate text into a single part or multiple
-                full_message_text_for_model += part_data["data"] + "\n"
+                if part_data.get("data", "").strip():
+                    adk_parts.append(Part.from_text(text=part_data["data"]))
             elif part_data["type"] == "image":
-                public_url = part_data.get("public_url")
-                logger.info("Public URL for image part: %s", public_url)
-                if not public_url:
-                    # This is the critical change. We no longer try to sign here.
-                    # We raise an error if the public URL is missing.
-                    error_msg = f"Image part is missing its public URL for LiteLLM call. Stored gs_uri was {part_data.get('gs_uri')}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
-                litellm_content.append({"type": "image_url", "image_url": {"url": public_url}})
+                gs_uri = part_data.get("gs_uri")
+                # Get image bytes from GCS
+                if gs_uri and gs_uri.startswith("gs://"):
+                    bucket_name = gs_uri.split('/')[2]
+                    blob_name = '/'.join(gs_uri.split('/')[3:])
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(blob_name)
+                    image_bytes = blob.download_as_bytes()
+                    mime_type = part_data.get("mimeType") or "image/jpeg"  # Default/fallback
+                    adk_parts.append(Part.from_bytes(data=image_bytes, mime_type=mime_type))
+                else:
+                    public_url = part_data.get("public_url")
+                    logger.warn(f"Image part without gs_uri found (public_url: {public_url}), skipping because we require gs submitted images.")
+                    # You could (if you trust public_url) download via HTTP instead,
+                    # or error if this is unexpected in your config
+                    # For strict GCS-pipeline-based artifact submission, it's best to require gs_uri.
 
-                # Prepend text content to the list
-        if full_message_text_for_model.strip():
-            litellm_content.insert(0, {"type": "text", "text": full_message_text_for_model.strip()})
+        # Compose the ADK Content for the model run
+        message_content_for_runner = Content(role="user", parts=adk_parts)
 
-            # This is a workaround to pass the complex structure to the ADK's LiteLLM wrapper.
-        # We pass a special JSON string that the LiteLLM model class in adk_helpers will be adapted to parse.
-        # If no images, we pass a simple text string.
-        if any(p['type'] == 'image_url' for p in litellm_content):
-            # This indicates to the underlying model wrapper to use the multimodal format.
-            message_content_for_runner = Content(role="user", parts=[Part.from_text(
-                text= json.dumps({"multimodal_content": litellm_content}))
-            ])
-        else:
-            message_content_for_runner = Content(role="user", parts=[Part.from_text(text = full_message_text_for_model)])
-
-
-        # Construct multimodal input for LiteLLM
-        litellm_content = []
-        full_message_text_for_model = ""
-        for part_data in multimodal_parts:
-            if part_data["type"] == "text":
-                # For LiteLLM, we can aggregate text into a single part or multiple
-                full_message_text_for_model += part_data["data"] + "\n"
-            elif part_data["type"] == "image":
-                public_url = part_data.get("public_url")
-                logger.info("Public URL for image part: %s", public_url)
-                if not public_url:
-                    # This is the critical change. We no longer try to sign here.
-                    # We raise an error if the public URL is missing.
-                    error_msg = f"Image part is missing its public URL for LiteLLM call. Stored gs_uri was {part_data.get('gs_uri')}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
-                litellm_content.append({"type": "image_url", "image_url": {"url": public_url}})
-
-                # Prepend text content to the list
-        if full_message_text_for_model.strip():
-            litellm_content.insert(0, {"type": "text", "text": full_message_text_for_model.strip()})
-
-            # This is a workaround to pass the complex structure to the ADK's LiteLLM wrapper.
-        # We pass a special JSON string that the LiteLLM model class in adk_helpers will be adapted to parse.
-        # If no images, we pass a simple text string.
-        if any(p['type'] == 'image_url' for p in litellm_content):
-            # This indicates to the underlying model wrapper to use the multimodal format.
-            message_content_for_runner = Content(role="user", parts=[Part.from_text(
-                text= json.dumps({"multimodal_content": litellm_content}))
-            ])
-        else:
-            message_content_for_runner = Content(role="user", parts=[Part.from_text(text = full_message_text_for_model)])
-
-        runner = Runner(agent=local_adk_agent, app_name=local_adk_agent.name, session_service=InMemorySessionService(), artifact_service=InMemoryArtifactService(), memory_service=InMemoryMemoryService())
+        runner = Runner(
+            agent=local_adk_agent,
+            app_name=local_adk_agent.name,
+            session_service=InMemorySessionService(),
+            artifact_service=InMemoryArtifactService(),
+            memory_service=InMemoryMemoryService()
+        )
         session = await runner.session_service.create_session(app_name=runner.app_name, user_id=adk_user_id)
-
-        message_content = Content(role="user", parts=[Part(text=final_message_for_agent)])
 
         final_text = ""
         errors = []
 
         try:
-            async for event_obj in runner.run_async(user_id=adk_user_id, session_id=session.id, new_message=message_content_for_runner):
+            async for event_obj in runner.run_async(
+                    user_id=adk_user_id,
+                    session_id=session.id,
+                    new_message=message_content_for_runner
+            ):
                 event_dict = event_obj.model_dump()
                 assistant_message_ref.update({"run.outputEvents": firestore.ArrayUnion([event_dict])})
                 content = event_dict.get("content", {})
