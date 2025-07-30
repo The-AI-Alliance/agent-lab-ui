@@ -4,9 +4,8 @@ import base64
 import requests
 import io # For PyPDF2 with in-memory bytes
 from pypdf import PdfReader
-# from bs4 import BeautifulSoup # Optional: for cleaner web text
-from firebase_functions import https_fn, options
-from common.core import logger # Assuming your logger setup
+from firebase_functions import https_fn
+from common.core import logger
 
 # --- Web Page Fetching ---
 def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
@@ -60,15 +59,10 @@ def fetch_repo_file_content(owner, repo, path, token):
     try:
         response = requests.get(file_url, headers=headers, timeout=10)
         response.raise_for_status()
-        # GitHub API returns content base64 encoded if it's not raw.
-        # Since we request raw, it should be text. If it was JSON response:
-        # content_encoded = response.json().get('content')
-        # if content_encoded:
-        #     return base64.b64decode(content_encoded).decode('utf-8', errors='replace')
-        return response.text # Directly text due to 'raw' header
+        return response.text
     except requests.exceptions.RequestException as e:
         logger.warn(f"Failed to fetch content for {path} in {owner}/{repo}: {e}")
-        return None # Or raise specific error to skip file
+        return None
     except Exception as e:
         logger.error(f"Unexpected error fetching file content for {path}: {e}")
         return None

@@ -26,15 +26,14 @@ from .query_vertex_runner import run_vertex_stream_query
 from .query_local_diagnostics import try_local_diagnostic_run
 from vertexai.agent_engines import get as get_engine
 from google.adk.sessions import VertexAiSessionService
-
-
+from google.genai.types import Content, Part
 
 
 async def get_full_message_history(chat_id, leaf_message_id):
     """Reconstructs the conversation history leading up to a specific message."""
     messages = {}
     messages_collection = db.collection("chats").document(chat_id).collection("messages")
-    docs = messages_collection.get()
+    docs = messages_collection.stream()
     for doc in docs:
         messages[doc.id] = doc.to_dict()
 
@@ -48,7 +47,7 @@ async def get_full_message_history(chat_id, leaf_message_id):
 
 async def _run_a2a_agent_unary(
         participant_config: dict,
-        conversation_history: list,
+        message_content_for_agent: str,
         assistant_message_ref
 ):
     """
@@ -60,13 +59,10 @@ async def _run_a2a_agent_unary(
     if not endpoint_url:
         raise ValueError("A2A agent config is missing 'endpointUrl'.")
 
-    last_user_message = next((msg for msg in reversed(conversation_history) if msg.get("participant", "").startswith("user:")), None)
-    a2a_message_content = last_user_message.get("content", "") if last_user_message else ""
-
     a2a_message = A2AMessage(
         messageId=str(uuid.uuid4()),
         role="user",
-        parts=[TextPart(text=a2a_message_content)]
+        parts=[TextPart(text=message_content_for_agent)]
     )
 
     send_request_payload = {
@@ -124,7 +120,7 @@ async def _run_a2a_agent_unary(
 
 async def _run_a2a_agent_stream(
         participant_config: dict,
-        conversation_history: list,
+        message_content_for_agent: str,
         assistant_message_ref
 ):
     """
@@ -136,17 +132,13 @@ async def _run_a2a_agent_stream(
     if not endpoint_url:
         raise ValueError("A2A agent config is missing 'endpointUrl'.")
 
-        # 1. Construct the initial message payload for the A2A agent
-    last_user_message = next((msg for msg in reversed(conversation_history) if msg.get("participant", "").startswith("user:")), None)
-    a2a_message_content = last_user_message.get("content", "") if last_user_message else ""
-
-    if not a2a_message_content:
-        logger.warn(f"[A2AExecutor/Stream] No user content found in history. Sending an empty message.")
+    if not message_content_for_agent:
+        logger.warn(f"[A2AExecutor/Stream] No user content found. Sending an empty message.")
 
     a2a_message = A2AMessage(
         messageId=str(uuid.uuid4()),
         role="user",
-        parts=[TextPart(text=a2a_message_content)]
+        parts=[TextPart(text=message_content_for_agent)]
     )
 
     # 2. Prepare for the two-step protocol
@@ -285,15 +277,22 @@ async def _execute_and_stream_to_firestore(
 
     assistant_message_data = assistant_message_snap.to_dict()
     parent_message_id = assistant_message_data.get("parentMessageId")
-    if not parent_message_id:
-        # If there's no parent, it's the first message. The history is just the input message.
-        conversation_history = [{"content": assistant_message_data.get("run", {}).get("inputMessage", "")}]
-    else:
-        conversation_history = await get_full_message_history(chat_id, parent_message_id)
 
-        # Format for ADK: combine all messages into one string
-    # A more sophisticated approach might use structured input later
-    full_message_text = "\n\n".join([msg.get("content", "") for msg in conversation_history])
+    conversation_history = await get_full_message_history(chat_id, parent_message_id)
+
+    # --- START OF FIX ---
+    stuffed_context_items = assistant_message_data.get("run", {}).get("stuffedContextItems")
+
+    context_string_prefix = ""
+    if stuffed_context_items and isinstance(stuffed_context_items, list):
+        logger.info(f"[TaskExecutor] Prepending {len(stuffed_context_items)} stuffed context items to the query.")
+        context_parts = []
+        for item in stuffed_context_items:
+            item_name = item.get("name", "Unnamed Context Item")
+            item_content = item.get("content", "[Content not available]")
+            context_parts.append(f"File: {item_name}\n```\n{item_content}\n```")
+        context_string_prefix = "\n---\n".join(context_parts) + "\n---\nUser Query:\n"
+        # --- END OF FIX ---
 
     logger.info(f"[TaskExecutor] Initiating query for assistant message: {assistant_message_id}.")
 
@@ -317,18 +316,27 @@ async def _execute_and_stream_to_firestore(
     # === DISPATCHER LOGIC ===
     if agent_id and agent_platform == 'a2a':
         logger.info(f"[A2AExecutor/Dispatch] Handling A2A agent: {agent_id}")
-        agent_capabilities = participant_config.get("capabilities", {})
-        logger.info(f"[A2AExecutor/Dispatch] Agent capabilities: {agent_capabilities}")
+
+        # Construct the message content for the A2A agent, including context
+        last_user_message = next((msg for msg in reversed(conversation_history) if msg.get("participant", "").startswith("user:")), None)
+        user_message_content = last_user_message.get("content", "") if last_user_message else ""
+        final_a2a_message_content = (context_string_prefix + user_message_content).strip()
+
+        agent_capabilities = participant_config.get("agentCard", {}).get("capabilities", {})
         is_streaming = agent_capabilities.get("streaming", False)
 
         if is_streaming:
             logger.info("[A2AExecutor/Dispatch] Determined agent protocol: Streaming. Calling stream handler.")
-            return await _run_a2a_agent_stream(participant_config, conversation_history, assistant_message_ref)
+            return await _run_a2a_agent_stream(participant_config, final_a2a_message_content, assistant_message_ref)
         else:
             logger.info("[A2AExecutor/Dispatch] Determined agent protocol: Non-Streaming (Unary). Calling unary handler.")
-            return await _run_a2a_agent_unary(participant_config, conversation_history, assistant_message_ref)
+            return await _run_a2a_agent_unary(participant_config, final_a2a_message_content, assistant_message_ref)
 
-    elif agent_id: # Defaults to google_vertex
+            # For Vertex and Model runs, combine the full history with the context
+    full_message_text = "\n\n".join([msg.get("content", "") for msg in conversation_history if msg.get("content")])
+    final_message_for_agent = (context_string_prefix + full_message_text).strip()
+
+    if agent_id: # Defaults to google_vertex
         resource_name = participant_config.get("vertexAiResourceName")
         if not resource_name or participant_config.get("deploymentStatus") != "deployed":
             raise ValueError(f"Agent {agent_id} is not successfully deployed.")
@@ -344,44 +352,39 @@ async def _execute_and_stream_to_firestore(
         remote_app = get_engine(resource_name)
 
         final_text, errors, had_exceptions, num_events = await run_vertex_stream_query(
-            remote_app, full_message_text, adk_user_id, current_adk_session_id, assistant_message_ref
+            remote_app, final_message_for_agent, adk_user_id, current_adk_session_id, assistant_message_ref
         )
         return {"finalResponseText": final_text, "queryErrorDetails": errors}
 
     elif model_id:
-        # This is for ephemeral model execution. It uses the same logic as local diagnostics.
-        # It instantiates a temporary, tool-less agent with the model's config.
+        # This is for ephemeral model execution.
         model_only_agent_config = {
             "name": f"ephemeral_model_run_{model_id[:6]}",
             "agentType": "Agent",
-            "tools": [], # No tools for direct model queries
-            "modelId": model_id, # Key change: reference the model
+            "tools": [],
+            "modelId": model_id,
         }
 
-        # This will now fetch model config and merge it inside
         local_adk_agent = await instantiate_adk_agent_from_config(
             model_only_agent_config,
             parent_adk_name_for_context=f"model_run_{chat_id[:4]}"
         )
 
-        # This part reuses the local diagnostic runner logic
         from google.adk.runners import Runner
         from google.adk.sessions import InMemorySessionService
         from google.adk.artifacts import InMemoryArtifactService
         from google.adk.memory import InMemoryMemoryService
-        from google.genai.types import Content, Part
 
         runner = Runner(agent=local_adk_agent, app_name=local_adk_agent.name, session_service=InMemorySessionService(), artifact_service=InMemoryArtifactService(), memory_service=InMemoryMemoryService())
         session = await runner.session_service.create_session(app_name=runner.app_name, user_id=adk_user_id)
 
-        message_content = Content(role="user", parts=[Part(text=full_message_text)])
+        message_content = Content(role="user", parts=[Part(text=final_message_for_agent)])
 
         final_text = ""
         errors = []
         try:
             async for event_obj in runner.run_async(user_id=adk_user_id, session_id=session.id, new_message=message_content):
                 event_dict = event_obj.model_dump()
-                # Stream events to Firestore for live UI updates
                 assistant_message_ref.update({"run.outputEvents": firestore.ArrayUnion([event_dict])})
                 content = event_dict.get("content", {})
                 if content and content.get("parts"):
@@ -393,6 +396,7 @@ async def _execute_and_stream_to_firestore(
             errors.append(f"Model run failed: {str(e_model_run)}")
 
         return {"finalResponseText": final_text, "queryErrorDetails": errors}
+
 
 async def _run_agent_task_logic(data: dict):
     """

@@ -1,7 +1,5 @@
 # functions/handlers/vertex/query_orchestrator.py
-import traceback
 import json
-from datetime import datetime, timezone
 from google.cloud import tasks_v2
 
 from firebase_admin import firestore
@@ -10,9 +8,6 @@ from firebase_functions import https_fn
 from common.core import db, logger
 from common.config import get_gcp_project_config
 from common.utils import initialize_vertex_ai
-from common.adk_helpers import get_model_config_from_firestore
-
-# The executor logic is now in the task handler, so we remove the import here.
 
 def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
     """
@@ -26,6 +21,7 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
     adk_user_id = data.get("adkUserId")
     chat_id = data.get("chatId")
     parent_message_id = data.get("parentMessageId") # Can be null
+    stuffed_context_items = data.get("stuffedContextItems") # <-- GET THE CONTEXT
     firebase_auth_uid = req.auth.uid if req.auth else "unknown_firebase_auth_uid"
 
     if not chat_id or not adk_user_id:
@@ -83,6 +79,7 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
             "status": "pending",
             "inputMessage": message_text,
             "outputEvents": [],
+            "stuffedContextItems": stuffed_context_items, # <-- SAVE THE CONTEXT
         }
     }
     batch.set(assistant_message_ref, assistant_message_data)
@@ -134,4 +131,4 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
         # 4. Immediately return the ID of the assistant's message to the client
     return {"success": True, "assistantMessageId": assistant_message_id}
 
-__all__ = ['query_deployed_agent_orchestrator_logic']
+__all__ = ['query_deployed_agent_orchestrator_logic']  

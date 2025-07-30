@@ -2,16 +2,16 @@
 # main.py - Entry point for Firebase Functions
 
 from firebase_functions import https_fn, options, tasks_fn
-from firebase_functions.options import RateLimits, RetryConfig, TaskQueueOptions
+from firebase_functions.options import RateLimits, RetryConfig
 
 from common.utils import handle_exceptions_and_log
-import asyncio # For running async logic from mcp_handler
+import asyncio
 
 # Import the logic functions from their respective handlers
 from handlers.vertex_agent_handler import (
     _deploy_agent_to_vertex_logic,
     _delete_vertex_agent_logic,
-    query_deployed_agent_orchestrator_logic as _execute_query_logic, # Renamed import
+    query_deployed_agent_orchestrator_logic as _execute_query_logic,
     _check_vertex_agent_deployment_status_logic
 )
 from handlers.vertex.task_handler import run_agent_task_wrapper

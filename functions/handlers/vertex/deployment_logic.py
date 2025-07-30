@@ -9,7 +9,6 @@ from vertexai import agent_engines as deployed_agent_engines
 import os
 
 from common.core import db, logger
-from common.config import get_gcp_project_config
 from common.utils import initialize_vertex_ai
 from common.adk_helpers import (
     generate_vertex_deployment_display_name,
@@ -39,7 +38,6 @@ def _deploy_agent_to_vertex_logic(req: https_fn.CallableRequest): # Remains sync
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.ABORTED, message=f"Failed to set initial deployment status for agent {agent_doc_id}.")
 
     initialize_vertex_ai()
-    adk_agent = None
 
     try:
         # Run the async agent instantiation within the synchronous function
@@ -96,7 +94,7 @@ def _deploy_agent_to_vertex_logic(req: https_fn.CallableRequest): # Remains sync
                 elif not base_url_for_pip.startswith("git+"): # Add git+ if not present (for https)
                     base_url_for_pip = "git+" + base_url_for_pip
 
-                    # Extract user-specified ref (branch/tag/commit) from URL if present (e.g., ...repo.git@my-branch)
+                # Extract user-specified ref (branch/tag/commit) from URL if present (e.g., ...repo.git@my-branch)
                 user_specified_ref = None
                 match_repo_and_ref = re.match(r"^(.*\/[^@/]+(?:\.git)?)(?:@([^#]+))?$", base_url_for_pip)
                 repo_path_for_install = base_url_for_pip # Default if no @ref
@@ -110,9 +108,6 @@ def _deploy_agent_to_vertex_logic(req: https_fn.CallableRequest): # Remains sync
                 # Check if the ref is a commit hash (to avoid cache-busting timestamp)
                 is_commit_hash_ref = bool(user_specified_ref and re.fullmatch(r"[0-9a-fA-F]{7,40}", user_specified_ref))
 
-
-                # Construct #egg= part carefully
-                # Try to parse egg name from fragment first
                 parsed_egg_name = None
                 if fragment_str and "egg=" in fragment_str:
                     egg_match_in_fragment = re.search(r"egg=([^&\[\]]+)", fragment_str) # Avoid extras like egg=name[extras]
