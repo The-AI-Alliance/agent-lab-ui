@@ -92,8 +92,9 @@ jobs:
           echo "---------------------------------------"  
             
           echo "Deploying Functions to project: $GOOGLE_CLOUD_PROJECT"  
-          firebase deploy --only firestore:indexes --project "$GOOGLE_CLOUD_PROJECT"
           
+          firebase deploy --only firestore:indexes --project "$GOOGLE_CLOUD_PROJECT"
+
       - name: Clean up config file
         if: always()
         run: rm -f src/firebaseConfig.json
