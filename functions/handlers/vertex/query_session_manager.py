@@ -1,7 +1,7 @@
 # functions/handlers/vertex/query_session_manager.py
 import traceback
 from common.core import logger
-from google.adk.sessions import VertexAiSessionService # Assuming this will be used directly
+from google.adk.sessions import VertexAiSessionService
 
 async def ensure_adk_session(
         session_service: VertexAiSessionService,

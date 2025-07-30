@@ -1,6 +1,5 @@
 # functions/handlers/a2a_handler.py
 import httpx
-import asyncio
 from firebase_functions import https_fn
 from common.core import logger
 import traceback
@@ -14,7 +13,7 @@ async def _fetch_a2a_agent_card_logic_async(req: https_fn.CallableRequest):
     if not endpoint_url:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="endpointUrl is required.")
 
-        # A2A spec requires fetching the AgentCard from a well-known path relative to the base URL.
+    # A2A spec requires fetching the AgentCard from a well-known path relative to the base URL.
     agent_card_url = urljoin(endpoint_url, "/.well-known/agent.json")
 
     logger.info(f"[A2AHandler] Fetching AgentCard from well-known URL: {agent_card_url}")

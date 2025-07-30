@@ -1,6 +1,5 @@
 # functions/handlers/vertex/query_local_diagnostics.py
 import os
-import asyncio
 import traceback
 from common.core import db, logger
 from common.adk_helpers import instantiate_adk_agent_from_config # Now async
@@ -29,10 +28,6 @@ async def try_local_diagnostic_run(
     try:
         # Manage environment variables carefully for the diagnostic scope
         vars_to_manage = ["GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION"]
-        # LiteLLM might also look for provider-specific API keys if not passed directly.
-        # Ensure these are set in the function's environment or handled by LiteLlm model kwargs.
-        # Example: if GEMINI_API_KEY is needed by LiteLlm for a gemini model
-        # if project_id_for_diag: vars_to_manage.append("GEMINI_API_KEY") # Or GOOGLE_API_KEY
 
         for var_name in vars_to_manage:
             original_env[var_name] = os.environ.get(var_name)

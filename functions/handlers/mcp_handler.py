@@ -7,7 +7,7 @@ from firebase_functions import https_fn
 
 from mcp.client.session import ClientSession
 from mcp.client.sse import sse_client
-from mcp.client.streamable_http import streamablehttp_client # Import StreamableHTTP client
+from mcp.client.streamable_http import streamablehttp_client
 from mcp.shared.metadata_utils import get_display_name
 from common.core import logger
 
@@ -41,12 +41,8 @@ async def _list_mcp_server_tools_logic_async(req: https_fn.CallableRequest):
             headers[auth_config["name"]] = auth_config["key"]
             logger.info(f"Using API Key authentication for {server_url} (Header: {auth_config['name']}).")
 
-    client_context_manager = None
-    transport_description = ""
     client_kwargs = {"headers": headers} if headers else {}
 
-
-    # Determine which client to use based on the URL
     if server_url.endswith("/sse"):
         client_context_manager = sse_client(url=server_url, **client_kwargs)
         transport_description = "SSE"
@@ -62,7 +58,6 @@ async def _list_mcp_server_tools_logic_async(req: https_fn.CallableRequest):
                 read_stream, write_stream = client_streams_tuple
             else:  # StreamableHTTP
                 read_stream, write_stream, _get_session_id = client_streams_tuple
-                # _get_session_id is available if needed for StreamableHTTP, but not used here.
 
             logger.info(f"Connection established via {transport_description} client.")
             async with ClientSession(read_stream, write_stream) as mcp_client:

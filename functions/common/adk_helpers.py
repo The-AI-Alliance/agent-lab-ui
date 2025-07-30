@@ -3,13 +3,11 @@ import re
 import os
 import importlib
 import traceback
-import asyncio # Import asyncio
+
 from .core import logger, db
 from google.adk.agents import Agent, SequentialAgent, LoopAgent, ParallelAgent # LlmAgent is aliased as Agent
-from google.adk.tools.agent_tool import AgentTool
 from google.adk.models.lite_llm import LiteLlm
-from google.genai import types as genai_types # For GenerateContentConfig
-# Updated import for MCPToolset and its params
+from google.genai import types as genai_types
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 
 from google.adk.tools.mcp_tool.mcp_session_manager import (
@@ -21,15 +19,7 @@ from .config import get_gcp_project_config
 from google.adk.auth.auth_schemes import AuthScheme
 from google.adk.auth.auth_credential import AuthCredential, AuthCredentialTypes, HttpAuth, HttpCredentials
 from fastapi.openapi.models import APIKey, APIKeyIn, HTTPBearer
-from google.adk.auth.auth_schemes import AuthSchemeType
 
-
-# SseServerParams was already imported from mcp_tool.mcp_toolset,
-# StreamableHTTPConnectionParams is also available there.
-
-# This mapping helps the backend determine LiteLLM prefixes and expected API key env vars.
-# It's a simplified version of what was in PYTHON_AGENT_CONSTANTS before,
-# as the frontend now sends more structured data.
 BACKEND_LITELLM_PROVIDER_CONFIG = {
     "openai": {"prefix": "openai", "apiKeyEnv": "OPENAI_API_KEY"},
     "openai_compatible": {"prefix": "openai", "apiKeyEnv": None}, # User provides key/base
@@ -47,8 +37,6 @@ BACKEND_LITELLM_PROVIDER_CONFIG = {
     "custom": {"prefix": None, "apiKeyEnv": None} # No prefix, user provides full string
 }
 
-
-
 def generate_vertex_deployment_display_name(agent_config_name: str, agent_doc_id: str) -> str:
     base_name = agent_config_name or f"adk-agent-{agent_doc_id}"
     # Vertex AI display names must be 4-63 chars, start with letter, contain only lowercase letters, numbers, hyphens.
@@ -64,8 +52,6 @@ def generate_vertex_deployment_display_name(agent_config_name: str, agent_doc_id
         deployment_display_name = f"a-{core_name}"
     else:
         deployment_display_name = sanitized_base
-
-        # Ensure minimum length of 4 (Vertex requirement)
     # Ensure final length is within 63 characters
     deployment_display_name = deployment_display_name[:63]
     while len(deployment_display_name) < 4 and len(deployment_display_name) < 63 : # Check max length again here

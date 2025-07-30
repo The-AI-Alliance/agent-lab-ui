@@ -1,7 +1,5 @@
 # functions/handlers/vertex/query_orchestrator.py
-import traceback
 import json
-from datetime import datetime, timezone
 from google.cloud import tasks_v2
 
 from firebase_admin import firestore
@@ -10,9 +8,6 @@ from firebase_functions import https_fn
 from common.core import db, logger
 from common.config import get_gcp_project_config
 from common.utils import initialize_vertex_ai
-from common.adk_helpers import get_model_config_from_firestore
-
-# The executor logic is now in the task handler, so we remove the import here.
 
 def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
     """
