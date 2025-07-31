@@ -1,11 +1,11 @@
-name: Deploy Firebase Indexes
+name: Deploy Firebase Indexes and Rules
 
 on:
   workflow_dispatch:
 
 jobs:
   deploy_functions:
-    name: Deploy Firebase Indexes
+    name: Deploy Firebase Indexes and Rules
     runs-on: ubuntu-latest
 
     steps:
@@ -91,9 +91,13 @@ jobs:
           ls -la # Show files in current directory, check for firebase.json  
           echo "---------------------------------------"  
             
-          echo "Deploying Functions to project: $GOOGLE_CLOUD_PROJECT"  
-          
+          echo "Deploying indexes to project: $GOOGLE_CLOUD_PROJECT"  
+
           firebase deploy --only firestore:indexes --project "$GOOGLE_CLOUD_PROJECT"
+
+          echo "Deploying security rules to project: $GOOGLE_CLOUD_PROJECT"  
+
+          firebase deploy --only firestore:rules --project "$GOOGLE_CLOUD_PROJECT"
 
       - name: Clean up config file
         if: always()

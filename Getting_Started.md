@@ -216,7 +216,7 @@ Choose your deployment method:
 1. Go to **Actions** tab in your repository
 2. Run **"Deploy to My Fork"** workflow for hosting
 3. Run **"Deploy Firebase Functions Manually"** for backend functions
-4. Run **"Deploy Firebase Indexes"** workflow to create the appropriate indexes on the application database
+4. Run **"Deploy Firebase Indexes and Rules"** workflow to create the appropriate indexes and security rules on the application database
 
 ### Step 5: Access Your Deployed Application
 
