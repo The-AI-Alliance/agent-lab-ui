@@ -1,30 +1,48 @@
 # Document: `users/{userId}`
 
-This collection is not explicitly managed by the provided backend functions, but its existence is implied by Firebase Authentication. The `{userId}` corresponds to the UID assigned to a user upon authentication. While no specific document schema is defined or used in the backend logic, the UID is crucial for scoping other resources.
+This collection stores profile information and application-specific permissions for each authenticated user. The `{userId}` corresponds to the UID assigned by Firebase Authentication. This document is created and updated automatically on user login and can be modified by administrators to grant permissions.
 
 ## Purpose
 
-The primary purpose of the user's UID in this system is to act as a namespace for user-specific data, ensuring data privacy and isolation.
-
-*   **GCS Scoping:** The `_upload_image_and_get_uri_logic` function uses the user's UID to construct a path in Google Cloud Storage (`users/{user_id}/images/...`), isolating uploaded images on a per-user basis.
-*   **ADK Scoping:** The `adk_user_id` (which is derived from the Firebase Auth UID on the client) is passed to all ADK-related functions (`_execute_and_stream_to_firestore`, `save_artifact`, `load_artifact`) to scope artifacts and sessions to a specific user.
+The user document serves two primary functions:
+1.  **Profile Storage:** It caches basic user profile information from the authentication provider (e.g., Google) like display name and email.
+2.  **Authorization:** It contains a `permissions` object that dictates what the user is allowed to do within the application, such as accessing the app at all or using the admin panel.
 
 ## Fields
 
-No fields are read from or written to this document by the backend functions. Any data stored here would be managed by other parts of the application, such as a user profile page on the client.
+| Field                       | Type          | Description                                                                                               | Set By                                   | Read By                                                   |    
+| --------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------- |    
+| `uid`                       | String        | The user's unique Firebase Authentication ID.                                                             | `ensureUserProfile`                      | `AuthContext`, `getUsersForAdminReview`                     |    
+| `email`                     | String        | The user's email address.                                                                                 | `ensureUserProfile`                      | Client/UI (`UserProfile`, `AdminPage`)                      |    
+| `displayName`               | String        | The user's display name.                                                                                  | `ensureUserProfile`                      | Client/UI (`UserProfile`, `AdminPage`)                      |    
+| `photoURL`                  | String        | A URL for the user's profile picture.                                                                     | `ensureUserProfile`                      | Client/UI (`UserProfile`)                                   |    
+| `createdAt`                 | Timestamp     | Server timestamp of when the user profile was first created.                                              | `ensureUserProfile`                      | Client/UI (`AdminPage`)                                     |    
+| `lastLoginAt`               | Timestamp     | Server timestamp of the user's last login.                                                                | `ensureUserProfile`                      | _(For client display)_                                        |    
+| `permissions`               | Map           | An object containing boolean flags for user permissions (e.g., `isAdmin`, `isAuthorized`).                | `updateUserPermissions` (from `AdminPage`) | `AuthContext` (for `ProtectedRoute`)                      |    
+| `permissionsLastUpdatedAt`  | Timestamp     | Server timestamp of when the permissions were last modified.                                              | `updateUserPermissions`                  | _(For client display)_                                        |    
 
 ## Prototypical Example
 
-A document in this collection is not created by the backend, but if it were, it might look like this:
-
 ```json  
 {  
-"displayName": "Alex",  
+"uid": "user-uid-abc-123",  
 "email": "alex@example.com",  
-"createdAt": "2024-01-01T12:00:00Z"  
+"displayName": "Alex",  
+"photoURL": "https://lh3.googleusercontent.com/a/...",  
+"createdAt": "2024-01-01T12:00:00Z",  
+"lastLoginAt": "2024-05-21T11:00:00Z",  
+"permissions": {  
+"isAuthorized": true,  
+"isAdmin": false,  
+"canCreateAgent": true,  
+"canRunAgent": true  
+},  
+"permissionsLastUpdatedAt": "2024-05-20T14:00:00Z"  
 }  
 ```
 
 ## Inconsistencies and Notes
 
-*   There is a distinction between `req.auth.uid` (the Firebase Auth UID) and `adkUserId` (a value passed from the client). The system assumes these are related, with the client likely using the Firebase UID to generate the `adkUserId`. This is a loose contract that relies on the client's implementation.  
+*   **Bootstrapping Permissions:** A new user who signs in for the first time will have a profile created by `ensureUserProfile` but will **not** have a `permissions` field. The `ProtectedRoute` component will then deny them access, redirecting them to `/unauthorized`. They will appear in the `AdminPage` list for an administrator to review and assign permissions. Once permissions are set, the user can access the app on their next login/refresh.
+*   **UID vs. `adkUserId`:** The backend logic for agent execution uses an `adkUserId` passed from the client. The client (`AgentRunner`) uses the `currentUser.uid` from `AuthContext` for this value, establishing a direct link between the Firebase Auth user and the ADK session/artifact owner.
+*   **GCS Scoping:** The `_upload_image_and_get_uri_logic` function correctly uses the user's UID to construct a path in Google Cloud Storage (`users/{user_id}/images/...`), isolating uploaded images on a per-user basis.  

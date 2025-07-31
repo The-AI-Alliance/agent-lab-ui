@@ -1,43 +1,43 @@
 # Document: `models/{modelId}`
 
-This document stores the configuration for a specific Large Language Model (LLM) provider and model string. It acts as a reusable template that agents can reference, abstracting away the specific API keys and parameters.
+This document stores the configuration for a specific Large Language Model (LLM) instance. It acts as a reusable template that agents can reference, abstracting away specific model parameters like system prompts and temperature.
 
 ## Fields
 
-| Field               | Type                  | Description                                                                                             | Set By                               | Read By                                                                                                 |  
-| ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |  
-| `name`              | String                | A user-friendly display name for the model configuration.                                               | Client/UI                            | _(Not used by backend)_                                                                                 |  
-| `description`       | String                | A brief description of the model or its intended use.                                                   | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `provider`          | String                | The LiteLLM provider key (e.g., `openai`, `google_ai_studio`, `anthropic`). Critical for routing.        | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `modelString`       | String                | The specific model name for the provider (e.g., `gpt-4-turbo`, `gemini-1.5-pro-latest`).                 | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `litellm_api_base`  | String                | (Optional) An override for the provider's base API URL.                                                 | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `litellm_api_key`   | String                | (Optional) An override for the API key, taking precedence over environment variables.                   | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `temperature`       | Number                | (Optional) The model's temperature setting (0.0 - 1.0).                                                 | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `maxOutputTokens`   | Number                | (Optional) The maximum number of tokens to generate.                                                    | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `topP`              | Number                | (Optional) The model's Top-P (nucleus sampling) value.                                                  | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `topK`              | Number                | (Optional) The model's Top-K sampling value.                                                            | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `stopSequences`     | Array of Strings      | (Optional) A list of strings that will cause the model to stop generating.                              | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `project_id`        | String                | (Optional) Specific to the `watsonx` provider for LiteLLM.                                              | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
-| `space_id`          | String                | (Optional) Specific to `watsonx` deployments.                                                           | Client/UI                            | `_prepare_agent_kwargs_from_config`                                                                     |  
+| Field               | Type                  | Description                                                                                             | Set By                                            | Read By                                                                                                 |    
+| ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |    
+| `name`              | String                | A user-friendly display name for the model configuration.                                               | Client/UI (`ModelForm`)                             | Client/UI (`ModelsPage`, `ModelDetailsPage`, `ModelSelector`)                                             |    
+| `description`       | String                | A brief description of the model or its intended use.                                                   | Client/UI (`ModelForm`)                             | `_prepare_agent_kwargs_from_config`, Client/UI (`ModelsPage`, `ModelDetailsPage`)                       |    
+| `projectIds`        | Array of Strings      | An array of project IDs this model is associated with.                                                  | Client/UI (`ModelForm`)                             | `getModelsForProjects`                                                                                    |    
+| `isPublic`          | Boolean               | If `true`, this model configuration is visible to all users.                                            | Client/UI (`ModelForm`)                             | `getPublicModels`                                                                                         |    
+| `provider`          | String                | The LiteLLM provider key (e.g., `openai`, `google_ai_studio`, `anthropic`). Critical for routing.        | Client/UI (`ModelForm`)                             | `_prepare_agent_kwargs_from_config`, Client/UI (`ModelDetailsPage`)                                     |    
+| `modelString`       | String                | The specific model name for the provider (e.g., `gpt-4-turbo`, `gemini-1.5-pro-latest`).                 | Client/UI (`ModelForm`)                             | `_prepare_agent_kwargs_from_config`, Client/UI (`ModelDetailsPage`)                                     |    
+| `systemInstruction` | String                | The system prompt to be used with this model.                                                           | Client/UI (`ModelForm`)                             | `_prepare_agent_kwargs_from_config`, Client/UI (`ModelDetailsPage`)                                     |    
+| `temperature`       | Number                | The model's temperature setting (0.0 - 1.0).                                                            | Client/UI (`ModelForm`)                             | `_prepare_agent_kwargs_from_config`, Client/UI (`ModelDetailsPage`)                                     |    
+| `ownerId`           | String                | The UID of the user who owns this model configuration.                                                  | `createModel`                                     | `getMyModels`                                                                                             |    
+| `createdAt`         | Timestamp             | Timestamp for when the document was created.                                                            | `createModel`                                     | _(For client display)_                                                                                  |    
+| `updatedAt`         | Timestamp             | Timestamp for when the document was last updated.                                                       | `createModel`, `updateModel`                      | _(For client display)_                                                                                  |    
 
 ## Prototypical Example
 
-```json  
+$$$json  
 {  
-"name": "OpenAI GPT-4 Turbo",  
-"description": "The latest GPT-4 model from OpenAI, optimized for chat.",  
+"name": "Creative Assistant GPT-4o",  
+"description": "A GPT-4o configuration with a higher temperature for creative writing tasks.",  
+"projectIds": ["proj_abc"],  
+"isPublic": true,  
 "provider": "openai",  
-"modelString": "gpt-4-turbo",  
-"temperature": 0.7,  
-"maxOutputTokens": 4096,  
-"topP": 1,  
-"stopSequences": [],  
-"litellm_api_base": null,  
-"litellm_api_key": null  
+"modelString": "gpt-4o",  
+"systemInstruction": "You are a creative writing assistant. Your goal is to help the user brainstorm and write compelling stories.",  
+"temperature": 0.9,  
+"ownerId": "user-uid-abc-123",  
+"createdAt": "2024-05-20T11:00:00Z",  
+"updatedAt": "2024-05-20T11:00:00Z"  
 }  
-```
+$$$
 
 ## Inconsistencies and Notes
 
-*   The backend functions **only read** from this collection. The schema is entirely dependent on the client/UI creating the documents correctly.
-*   The function `get_model_config_from_firestore` is asynchronous but is called inside a synchronous `asyncio.run()` in the call stack of `deploy_agent_to_vertex`, which is a valid but potentially inefficient pattern if used frequently in a larger async application. In the `task_handler`, it is called correctly within an async context.  
+*   **Frontend-Driven Schema:** The backend functions only **read** from this collection (`get_model_config_from_firestore` called by `_prepare_agent_kwargs_from_config`). The schema is entirely defined and managed by the frontend (`CreateModelPage`, `ModelForm`, etc.) through the `firebaseService` functions (`createModel`, `updateModel`).
+*   **No API Key Storage:** Unlike the original backend-only analysis might have inferred, API keys (`litellm_api_key`) are **not** stored in the model document. The frontend form does not have a field for them, and they are not passed to `createModel` or `updateModel`. The system relies on backend environment variables for API keys.
+*   The function `get_model_config_from_firestore` is asynchronous but is called inside a synchronous `asyncio.run()` in the call stack of `deploy_agent_to_vertex`, which is a valid but potentially inefficient pattern. In the `task_handler` (`executeQuery`), it is called correctly within an async context.  
