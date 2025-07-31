@@ -14,7 +14,7 @@ from handlers.vertex_agent_handler import (
     query_deployed_agent_orchestrator_logic as _execute_query_logic,
     _check_vertex_agent_deployment_status_logic
 )
-from handlers.vertex.task_handler import run_agent_task_wrapper
+from handlers.vertex.task import run_agent_task_wrapper
 from handlers.gofannon_handler import _get_gofannon_tool_manifest_logic
 from handlers.context_handler import (
     _fetch_web_page_content_logic,
@@ -82,18 +82,17 @@ def process_pdf_content(req: https_fn.CallableRequest):
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120)
 @handle_exceptions_and_log
 def uploadImageForContext(req: https_fn.CallableRequest):
+    # This now returns an object with a 'type' key to be consistent
     return _upload_image_and_get_uri_logic(req)
 
-@https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120) # Increased timeout for potential network calls
+@https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120)
 @handle_exceptions_and_log
 def list_mcp_server_tools(req: https_fn.CallableRequest):
-    # _list_mcp_server_tools_logic_async is async, so we need to run it in an event loop
     return asyncio.run(_list_mcp_server_tools_logic_async(req))
 
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=60)
 @handle_exceptions_and_log
 def fetchA2AAgentCard(req: https_fn.CallableRequest):
-    """Fetches the AgentCard from a remote A2A compliant agent endpoint."""
     return asyncio.run(_fetch_a2a_agent_card_logic_async(req))
 
 # Task handler for executing queries in the background
@@ -106,5 +105,5 @@ def fetchA2AAgentCard(req: https_fn.CallableRequest):
 )
 def executeAgentRunTask(req: tasks_fn.CallableRequest):
     """Background worker function triggered by Cloud Tasks."""
-    # The data from the enqueued task is in req.data
     run_agent_task_wrapper(req.data)
+  
