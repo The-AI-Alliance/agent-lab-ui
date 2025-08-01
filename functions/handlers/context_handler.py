@@ -4,7 +4,6 @@ import base64
 import uuid
 import requests
 import httpx
-import asyncio
 from google.cloud import storage
 import io
 from pypdf import PdfReader
@@ -16,6 +15,7 @@ from common.core import logger
 # --- Generic GCS Uploader Helper ---
 def _upload_bytes_to_gcs(user_id: str, file_bytes: bytes, file_name: str, mime_type: str, context_type: str):
     """Uploads a byte string to GCS and returns a structured response."""
+    logger.info(f"Uploading context file for user {user_id} to GCS: {file_name}, type: {context_type}, mimeType: {mime_type}")
     from common.config import get_gcp_project_config
     try:
         project_id, _, _ = get_gcp_project_config()
@@ -43,7 +43,8 @@ def _upload_bytes_to_gcs(user_id: str, file_bytes: bytes, file_name: str, mime_t
 
 
     # --- Web Page Fetching ---
-async def _fetch_web_page_content_logic_async(req: https_fn.CallableRequest):
+def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
+    logger.info(f"[_fetch_web_page_content_logic] Function called with data keys: {list(req.data.keys()) if isinstance(req.data, dict) else 'Non-dict data'}")
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
 
@@ -53,14 +54,14 @@ async def _fetch_web_page_content_logic_async(req: https_fn.CallableRequest):
 
     try:
         headers = {'User-Agent': 'AgentLab-ContextFetcher/1.0'}
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(url, headers=headers)
+        logger.info(f"[_fetch_web_page_content_logic] Fetching web page content from URL: {url}")
+        with httpx.Client(timeout=20.0) as client:
+            response = client.get(url, headers=headers)
             response.raise_for_status()
             raw_content_bytes = response.content
             mime_type = response.headers.get('Content-Type', 'text/plain; charset=utf-8').split(';')[0]
-
             file_name_from_url = url.split('/')[-1] or "webpage.html"
-
+        logger.info(f"Fetched web page content from {url}, size: {len(raw_content_bytes)} bytes, mimeType: {mime_type}")
         return _upload_bytes_to_gcs(
             user_id=req.auth.uid,
             file_bytes=raw_content_bytes,
@@ -80,20 +81,20 @@ NEW_FILE_SEPARATOR = "\n\n---<newfile>--\n\n"
 def get_github_token():
     return os.environ.get("GITHUB_TOKEN")
 
-async def fetch_repo_file_content(session: httpx.AsyncClient, owner, repo, path, token):
+def fetch_repo_file_content(session: httpx.Client, owner, repo, path, token):
     headers = {"Accept": "application/vnd.github.v3.raw"}
     if token:
         headers["Authorization"] = f"token {token}"
     file_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents/{path}"
     try:
-        response = await session.get(file_url, headers=headers, timeout=15)
+        response = session.get(file_url, headers=headers, timeout=15)
         response.raise_for_status()
         return response.text
     except httpx.RequestError as e:
         logger.warn(f"Failed to fetch content for {path} in {owner}/{repo}: {e}")
         return None
 
-async def list_repo_files_recursive(session: httpx.AsyncClient, owner, repo, path, token, include_ext, exclude_ext, files_list, processed_paths, depth=0):
+def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, include_ext, exclude_ext, files_list, processed_paths, depth=0):
     if depth > 10:
         logger.warn(f"Max recursion depth reached for path: '{path}' in {owner}/{repo}")
         return
@@ -106,7 +107,7 @@ async def list_repo_files_recursive(session: httpx.AsyncClient, owner, repo, pat
     contents_url_path_part = f"/{path.strip('/')}" if path.strip('/') else ""
     contents_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents{contents_url_path_part}"
     try:
-        response = await session.get(contents_url, headers=headers, timeout=20)
+        response = session.get(contents_url, headers=headers, timeout=20)
         response.raise_for_status()
         contents = response.json()
         if not isinstance(contents, list): return
@@ -126,15 +127,14 @@ async def list_repo_files_recursive(session: httpx.AsyncClient, owner, repo, pat
             elif item_type == "dir":
                 task = list_repo_files_recursive(session, owner, repo, item_path, token, include_ext, exclude_ext, files_list, processed_paths, depth + 1)
                 tasks.append(task)
-        if tasks:
-            await asyncio.gather(*tasks)
+
     except httpx.HTTPStatusError as e:
         if e.response is not None and e.response.status_code == 404:
             logger.warn(f"Directory/path '{path}' not found in {owner}/{repo} (404).")
             return
         raise
 
-async def _fetch_git_repo_contents_logic_async(req: https_fn.CallableRequest):
+def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
     data = req.data
@@ -145,8 +145,8 @@ async def _fetch_git_repo_contents_logic_async(req: https_fn.CallableRequest):
     auth_token = data.get("gitToken") or get_github_token()
     files_to_fetch_meta, processed_paths = [], set()
     try:
-        async with httpx.AsyncClient() as session:
-            await list_repo_files_recursive(session, org_user, repo_name, "", auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths)
+        with httpx.Client() as session:
+            list_repo_files_recursive(session, org_user, repo_name, "", auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths)
     except Exception as e_list:
         logger.error(f"Critical error during repo file listing for {org_user}/{repo_name}: {e_list}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to list repository files: {str(e_list)}")
@@ -156,9 +156,9 @@ async def _fetch_git_repo_contents_logic_async(req: https_fn.CallableRequest):
 
     content_chunks = []
     total_content_size, MAX_TOTAL_CONTENT_SIZE = 0, 5 * 1024 * 1024
-    async with httpx.AsyncClient() as session:
+    with httpx.Client() as session:
         fetch_tasks = [fetch_repo_file_content(session, org_user, repo_name, file_meta["path"], auth_token) for file_meta in files_to_fetch_meta]
-        fetched_contents = await asyncio.gather(*fetch_tasks)
+        fetched_contents = fetch_tasks
 
     for i, content in enumerate(fetched_contents):
         file_meta = files_to_fetch_meta[i]
@@ -173,6 +173,7 @@ async def _fetch_git_repo_contents_logic_async(req: https_fn.CallableRequest):
 
     monolithic_content = NEW_FILE_SEPARATOR.join(content_chunks)
     file_name = f"clone_{org_user}_{repo_name}.txt"
+    logger.info(f"Fetched {len(files_to_fetch_meta)} files from {org_user}/{repo_name}, total content size: {total_content_size} bytes.")
     return _upload_bytes_to_gcs(
         user_id=req.auth.uid,
         file_bytes=monolithic_content.encode('utf-8'),
@@ -182,7 +183,7 @@ async def _fetch_git_repo_contents_logic_async(req: https_fn.CallableRequest):
     )
 
 # --- PDF Processing ---
-async def _process_pdf_content_logic_async(req: https_fn.CallableRequest):
+def _process_pdf_content_logic(req: https_fn.CallableRequest):
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
     url, file_data_base64, file_name_from_client = req.data.get("url"), req.data.get("fileData"), req.data.get("fileName")
@@ -190,8 +191,8 @@ async def _process_pdf_content_logic_async(req: https_fn.CallableRequest):
     if url:
         pdf_source_name = url.split('/')[-1]
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers={'User-Agent': 'AgentLab-ContextFetcher/1.0'}, timeout=30)
+            with httpx.Client() as client:
+                response = client.get(url, headers={'User-Agent': 'AgentLab-ContextFetcher/1.0'}, timeout=30)
                 response.raise_for_status()
                 pdf_bytes = response.content
         except httpx.RequestError as e:
@@ -207,13 +208,14 @@ async def _process_pdf_content_logic_async(req: https_fn.CallableRequest):
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Either PDF URL or file data is required.")
     if not pdf_bytes:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="Could not load PDF data.")
+
     try:
         reader = PdfReader(io.BytesIO(pdf_bytes))
         text_content = "".join(page.extract_text() or "" for page in reader.pages)
         MAX_PDF_CONTENT_LENGTH = 2 * 1024 * 1024
         if len(text_content) > MAX_PDF_CONTENT_LENGTH:
             text_content = text_content[:MAX_PDF_CONTENT_LENGTH] + "\n... [PDF CONTENT TRUNCATED]"
-
+        logger.info(f"Extracted {len(text_content)} characters from PDF: {pdf_source_name}")
         return _upload_bytes_to_gcs(
             user_id=req.auth.uid,
             file_bytes=text_content.encode('utf-8'),
@@ -250,8 +252,8 @@ def _upload_image_and_get_uri_logic(req: https_fn.CallableRequest):
 
     # This __all__ list makes the functions importable by main.py
 __all__ = [
-    '_fetch_web_page_content_logic_async',
-    '_fetch_git_repo_contents_logic_async',
-    '_process_pdf_content_logic_async',
+    '_fetch_web_page_content_logic',
+    '_fetch_git_repo_contents_logic',
+    '_process_pdf_content_logic',
     '_upload_image_and_get_uri_logic'
 ]

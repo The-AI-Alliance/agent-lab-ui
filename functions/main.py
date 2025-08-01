@@ -17,9 +17,9 @@ from handlers.vertex_agent_handler import (
 from handlers.vertex.task import run_agent_task_wrapper
 from handlers.gofannon_handler import _get_gofannon_tool_manifest_logic
 from handlers.context_handler import (
-    _fetch_web_page_content_logic_async,
-    _fetch_git_repo_contents_logic_async,
-    _process_pdf_content_logic_async,
+    _fetch_web_page_content_logic,
+    _fetch_git_repo_contents_logic,
+    _process_pdf_content_logic,
     _upload_image_and_get_uri_logic
 )
 from handlers.mcp_handler import _list_mcp_server_tools_logic_async
@@ -67,17 +67,17 @@ def check_vertex_agent_deployment_status(req: https_fn.CallableRequest):
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=60)
 @handle_exceptions_and_log
 def fetch_web_page_content(req: https_fn.CallableRequest):
-    return _fetch_web_page_content_logic_async(req)
+    return _fetch_web_page_content_logic(req)
 
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=300)
 @handle_exceptions_and_log
 def fetch_git_repo_contents(req: https_fn.CallableRequest):
-    return _fetch_git_repo_contents_logic_async(req)
+    return _fetch_git_repo_contents_logic(req)
 
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120)
 @handle_exceptions_and_log
 def process_pdf_content(req: https_fn.CallableRequest):
-    return _process_pdf_content_logic_async(req)
+    return _process_pdf_content_logic(req)
 
 @https_fn.on_call(memory=options.MemoryOption.GB_1, timeout_sec=120)
 @handle_exceptions_and_log

@@ -59,14 +59,52 @@ async def _build_adk_content_from_history(
     if last_user_message:
         for part_data in last_user_message.get("parts", []):
             if "text" in part_data:
+                logger.info(f"[TaskExecutor] Adding text part with length {len(part_data['text'])}.")
                 text = part_data.get("text", "")
                 adk_parts.append(Part.from_text(text=text))
                 total_char_count += len(text)
             elif "file_data" in part_data:
-                file_info = part_data["file_data"]
-                if "file_uri" in file_info and "mime_type" in file_info:
-                    adk_parts.append(Part.from_uri(file_uri= file_info["file_uri"], mime_type=file_info["mime_type"]))
-                    # Character count for non-text parts is not directly applicable here but could be estimated if needed.
+                file_info = part_data.get("file_data", {})
+                uri = file_info.get("file_uri")
+                mime_type = file_info.get("mime_type")
+
+                if uri and mime_type:
+                    # If the part is an image, download its bytes from GCS.
+                    if mime_type.startswith("image/"):
+                        try:
+                            if not uri.startswith("gs://"):
+                                raise ValueError(f"Unsupported URI scheme for image download: {uri}")
+                            bucket_name = uri.split('/')[2]
+                            blob_name = '/'.join(uri.split('/')[3:])
+                            storage_client = storage.Client()
+                            bucket = storage_client.bucket(bucket_name)
+                            blob = bucket.blob(blob_name)
+                            image_bytes = blob.download_as_bytes()
+                            adk_parts.append(Part.from_bytes(data=image_bytes, mime_type=mime_type))
+                            logger.info(f"Successfully downloaded image from {uri} to include in ADK prompt.")
+                        except Exception as e:
+                            logger.error(f"Failed to download image from GCS URI {uri} for ADK prompt: {e}")
+                            adk_parts.append(Part.from_text(text=f"[Error: Could not load image from {uri}]"))
+                    elif mime_type.startswith("text/"):
+                        try:
+                            if not uri.startswith("gs://"):
+                                raise ValueError(f"Unsupported URI scheme for text download: {uri}")
+                            bucket_name = uri.split('/')[2]
+                            blob_name = '/'.join(uri.split('/')[3:])
+                            storage_client = storage.Client()
+                            bucket = storage_client.bucket(bucket_name)
+                            blob = bucket.blob(blob_name)
+                            text_content = blob.download_as_text()
+                            adk_parts.append(Part.from_text(text=text_content))
+                            logger.info(f"Successfully downloaded text from {uri} to include in ADK prompt.")
+                        except Exception as e:
+                            logger.error(f"Failed to download text from GCS URI {uri} for ADK prompt: {e}")
+                            adk_parts.append(Part.from_text(text=f"[Error: Could not load text from {uri}]"))
+                    else:
+                        # For other file types (like text from PDF), from_uri is appropriate.
+                        logger.warn(f"[_build_adk_content_from_history] Throwing a hail mary- file_uris don't usually work...  {mime_type} isn't handled yet.")
+                        adk_parts.append(Part.from_uri(file_uri=uri, mime_type=mime_type))
+
     else:
         # Handle cases where a run might be triggered without a preceding user message,
         # which is an edge case in the current UI but good practice to handle.
@@ -76,7 +114,7 @@ async def _build_adk_content_from_history(
     if not adk_parts:
         logger.warn("No message parts were created. Adding an empty text part to avoid ADK error.")
         adk_parts.append(Part.from_text(text=""))
-
+    logger.info(f"[TaskExecutor] Found {len(adk_parts)} adk_parts.")
     return Content(role="user", parts=adk_parts), total_char_count
 
 # --- Agent/Model Execution Logic ---
@@ -103,12 +141,12 @@ async def _run_adk_agent(local_adk_agent, adk_content_for_run, adk_user_id, assi
                 new_message=adk_content_for_run
         ):
             all_events.append(event_obj.model_dump())
-            logger.info(f"[_run_adk_agent] Event collected: {event_obj.model_dump()}")
+            #logger.info(f"[_run_adk_agent] Event collected: {event_obj.model_dump()}")
     except Exception as e_run:
         logger.error(f"Error during ADK agent run for '{local_adk_agent.name}': {e_run}\n{traceback.format_exc()}")
         errors.append(f"Agent/Model run failed: {str(e_run)}")
 
-    logger.info(f"[_run_adk_agent] Collected {len(all_events)} events from the ADK agent run.")
+    #logger.info(f"[_run_adk_agent] Collected {len(all_events)} events from the ADK agent run.")
     # Step 2: Write all collected events to Firestore in a batch for efficiency
     batch = db.batch()
     for index, event_dict in enumerate(all_events):
@@ -128,7 +166,7 @@ async def _run_adk_agent(local_adk_agent, adk_content_for_run, adk_user_id, assi
                      not any(part.get('function_call', None) in part for part in event.get('content', {}).get('parts', []))),
     None
     )
-    event = all_events[-1] if all_events else None
+
     if final_model_response_event:
         logger.info(f"[_run_adk_agent] Final model response event found: {final_model_response_event}")
         content = final_model_response_event.get("content", {})
@@ -157,15 +195,16 @@ async def _run_vertex_agent(resource_name, adk_content_for_run, adk_user_id, ass
                 message_text_for_vertex = f"[Image Content Provided ({image_count})]"
 
         # Step 1: Collect all events from the runner
-        async for event_obj in remote_app.stream_query(
+        for event_obj in remote_app.stream_query(
                 message=message_text_for_vertex,
                 user_id=adk_user_id,
                 # session_id is now managed by the VertexAiSessionService within the remote_app context
         ):
             if hasattr(event_obj, 'model_dump'): event_dict = event_obj.model_dump()
-            else: event_dict = {"raw": str(event_obj)}
+            else: event_dict = event_obj
 
             all_events.append(event_dict)
+        logger.info(f"[_run_vertex_agent] Collected {len(all_events)} events from the Vertex agent run.")
 
     except Exception as e:
         error_message = f"Vertex run failed: {str(e)}"
@@ -177,6 +216,7 @@ async def _run_vertex_agent(resource_name, adk_content_for_run, adk_user_id, ass
     batch = db.batch()
     for index, event_dict in enumerate(all_events):
         event_doc_ref = events_collection_ref.document()
+        logger.info(f"[_run_vertex_agent] Writing event {index} to Firestore: {event_dict}")
         event_with_meta = {**event_dict, "eventIndex": index, "timestamp": firestore.SERVER_TIMESTAMP}
         batch.set(event_doc_ref, event_with_meta)
     if all_events:
@@ -255,10 +295,12 @@ async def _execute_agent_run(
     parent_message_id = assistant_message_snap.to_dict().get("parentMessageId")
 
     conversation_history = await get_full_message_history(chat_id, parent_message_id)
+    logger.info(f"[TaskExecutor] Retrieved conversation_history: {conversation_history}")
     logger.info(f"[TaskExecutor] Full conversation history for message {assistant_message_id} retrieved with {len(conversation_history)} messages.")
     adk_content_for_run, char_count = await _build_adk_content_from_history(
         conversation_history
     )
+    logger.info(f"[TaskExecutor] ADK content built with: {adk_content_for_run}")
     assistant_message_ref.update({"inputCharacterCount": char_count})
 
     participant_ref = db.collection("agents").document(agent_id) if agent_id else db.collection("models").document(model_id)
@@ -269,7 +311,7 @@ async def _execute_agent_run(
     agent_platform = participant_config.get("platform")
     if agent_id and agent_platform == 'a2a':
         return await _run_a2a_agent(participant_config, adk_content_for_run, assistant_message_id, events_collection_ref)
-    elif agent_id and agent_platform == 'vertex':
+    elif agent_id and agent_platform == 'google_vertex':
         logger.info("[TaskExecutor] Running Vertex AI agent.")
         resource_name = participant_config.get("vertexAiResourceName")
         if not resource_name or participant_config.get("deploymentStatus") != "deployed":
@@ -304,6 +346,7 @@ async def _run_agent_task_logic(data: dict):
             agent_id=data.get("agentId"), model_id=data.get("modelId"),
             adk_user_id=data.get("adkUserId")
         )
+        logger.info(f"[TaskHandler] Final state data for message {assistant_message_id}: {final_state_data}")
         final_update_payload = {
             "parts": final_state_data.get("finalParts", []),
             "status": "error" if final_state_data.get("errorDetails") else "completed",
