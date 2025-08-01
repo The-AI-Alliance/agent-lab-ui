@@ -4,7 +4,8 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isOwner(docData) {
-      return request.auth != null && request.auth.uid == docData.ownerId || request.auth.uid == docData.userId;
+      // Handles both `ownerId` (projects, models) and `userId` (agents) fields.
+      return request.auth != null && (request.auth.uid == docData.ownerId || request.auth.uid == docData.userId);
     }
 
     function isAdmin() {
@@ -16,7 +17,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if request.auth.uid == userId || isAdmin();
       allow list: if isAdmin();
+      // Users can create their own profile upon first sign-in.
       allow create: if request.auth.uid == userId && !("permissions" in request.resource.data);
+      // Users can update non-permission fields; Admins can update permissions.
       allow update: if (request.auth.uid == userId &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt', 'email', 'displayName', 'photoURL', 'updatedAt']))
                     || (isAdmin() &&
@@ -42,43 +45,49 @@ service cloud.firestore {
       allow update, delete: if isOwner(resource.data) || isAdmin();
     }
 
-    // --- Agents Collection (Corrected) ---
+    // --- Agents Collection ---
     match /agents/{agentId} {
       function isAgentPublic() { return resource.data.isPublic == true; }
 
       allow create: if request.auth.uid == request.resource.data.userId;
-      // Read if owner, public, or admin.
       allow get: if isOwner(resource.data) || isAgentPublic() || isAdmin();
-      // List if authenticated. This is the key fix for the project details page.
       allow list: if request.auth != null;
       // Write if owner or admin, but don't let them change the owner.
       allow update: if (isOwner(resource.data) || isAdmin()) && request.resource.data.userId == resource.data.userId;
       allow delete: if isOwner(resource.data) || isAdmin();
 
-      // Agent Runs Subcollection (Kept simple for now)
+      // LEGACY: Agent Runs subcollection is deprecated and should no longer be written to.
+      // Read access is maintained for viewing any historical data that may still exist.
       match /runs/{runId} {
-        // This is legacy and can be tightened if needed
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if false; // Deny all new writes.
       }
     }
 
     // --- Chats Collection ---
     match /chats/{chatId} {
-      // NOTE: For now, any authenticated user can interact with any chat.
+      // NOTE: For now, any authenticated user can read/write to any chat.
       // This will be restricted by project membership in a future iteration.
       allow read, write: if request.auth != null;
 
       // Messages Subcollection
       match /messages/{messageId} {
-        // NOTE: Same as parent chat, open for now.
+        // Inherits parent chat permissions. Open for now.
         allow read, write: if request.auth != null;
+
+        // NEW: Events Subcollection
+        // Stores the detailed reasoning log for an assistant message.
+        match /events/{eventId} {
+          // Permissions should match the parent message.
+          allow read, write: if request.auth != null;
+        }
       }
     }
 
     // --- Gofannon Tool Manifest ---
     match /gofannonToolManifest/{docId} {
       allow read: if request.auth != null;
-      allow write: if isAdmin();
+      allow write: if isAdmin(); // Only admins can update the manifest.
     }
   }
 }

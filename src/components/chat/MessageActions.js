@@ -7,10 +7,8 @@ import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import DeveloperModeIcon from '@mui/icons-material/DeveloperMode';
 
-const MessageActions = ({ message, messagesMap, activePath, onNavigate, onFork, onViewLog, getChildrenForMessage, findLeafOfBranch }) => {
-    const children = getChildrenForMessage(messagesMap, message.id);
+const MessageActions = ({ message, messagesMap, activePath, onNavigate, onFork, onViewLog, getChildrenForMessage, findLeafOfBranch, isAssistantMessage }) => {     const children = getChildrenForMessage(messagesMap, message.id);
     const hasForks = children.length > 1;
-    const hasEvents = message.outputEvents && message.outputEvents.length > 0;
     const isContextMessage = message.participant === 'context_stuffed';
 
     // Find which of my children is in the active path
@@ -43,9 +41,9 @@ const MessageActions = ({ message, messagesMap, activePath, onNavigate, onFork, 
                 </Box>
             )}
             <Box sx={{ position: isContextMessage ? 'static' : 'absolute', right: 0, top: '50%', transform: isContextMessage ? 'none' : 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
-                {hasEvents && (
+                {isAssistantMessage && (
                     <Tooltip title="View Agent Reasoning Log">
-                        <IconButton size="small" onClick={() => onViewLog(message.outputEvents)}>
+                        <IconButton size="small" onClick={() => onViewLog(message.id)}>
                             <DeveloperModeIcon fontSize="small" />
                         </IconButton>
                     </Tooltip>

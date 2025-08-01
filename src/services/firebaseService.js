@@ -323,26 +323,12 @@ export const updateChatMessage = async (chatId, messageId, dataToUpdate) => {
 }
 
 
-// --- Agent Runs (Legacy) ---
-export const getAgentRuns = async (agentId) => {
-    const q = query(collection(db, "agents", agentId, "runs"), orderBy("timestamp", "desc"));
+// --- Events Subcollection ---
+export const getEventsForMessage = async (chatId, messageId) => {
+    const q = query(collection(db, "chats", chatId, "messages", messageId, "events"), orderBy("eventIndex", "asc"));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-};
-
-export const listenToAgentRun = (agentId, runId, onUpdate) => {
-    const runRef = doc(db, "agents", agentId, "runs", runId);
-    const unsubscribe = onSnapshot(runRef, (docSnap) => {
-        if (docSnap.exists()) {
-            onUpdate({ id: docSnap.id, ...docSnap.data() });
-        } else {
-            onUpdate(null, new Error("Run document not found."));
-        }
-    }, (error) => {
-        onUpdate(null, error);
-    });
-    return unsubscribe;
-};
+}
 
 
 // --- User Profile and Permissions ---

@@ -83,7 +83,7 @@ export const deployAgent = async (agentConfig, agentDocId) => {
 };
 
 // This function now handles querying agents OR models
-export const executeQuery = async ({ agentId, modelId, message, adkUserId, chatId, parentMessageId, stuffedContextItems = null }) => {
+export const executeQuery = async ({ agentId, modelId, message, adkUserId, chatId, parentMessageId, stuffedContextItems }) => {
     try {
         const payload = {
             agentId, // Can be null

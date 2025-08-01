@@ -26,7 +26,7 @@ This page tracks the implementation status of various Agent Development Kit (ADK
 |                           | Built-in: Vertex AI Search                          | ✅                   | ❓          | ❓           |  
 |                           | Third-Party Tools (LangChain, CrewAI via Gofannon)  | ✅                   | ❓          | ❓           |  
 |                           | OpenAPI Toolset Integration                         | 🚧                   | ❓          | ❓           |  
-|                           | MCP Toolset (ADK as client for external MCP)        | 🚧                   | ❓          | ❓           |  
+|                           | MCP Toolset (ADK as client for external MCP)        |                    | ❓          | ❓           |  
 |                           | Exposing ADK tools via custom MCP Server            | 🚧                   | ❓          | ❓           |  
 |                           | Google Cloud Tools (API Hub, App Int., DB Toolbox)  | 🚧                   | ❓          | ❓           |  
 |                           | Tool Authentication Support (via Gofannon tool config) | ✅                   | ❓          | ❓           |  

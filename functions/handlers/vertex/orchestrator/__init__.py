@@ -52,12 +52,14 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
         if message_text and message_text.strip():
             user_message_parts.append({"type": "text", "content": message_text})
 
-            # Add stubs for context items for display purposes on the client.
-        if stuffed_context_items:
-            for item in stuffed_context_items:
-                if isinstance(item, dict) and 'name' in item:
-                    # Depending on type, can add more info.
-                    user_message_parts.append({"type": "context_stub", "name": item['name'], "item_type": item.get('type')})
+        # Add stubs for context items for display purposes on the client.
+        # New: stuffedContextItems now contain GCS URIs and are structured like Parts
+        if stuffed_context_items and isinstance(stuffed_context_items, list):
+            for item in stuffed_context_items: # item is now a dict like {name, storageUrl, mimeType, type}
+                if isinstance(item, dict) and 'storageUrl' in item and 'mimeType' in item:
+                    user_message_parts.append({
+                        "file_data": {"file_uri": item['storageUrl'], "mime_type": item['mimeType']}
+                    })
 
         user_message_data = {
             "id": user_message_id,
@@ -85,14 +87,8 @@ def query_deployed_agent_orchestrator_logic(req: https_fn.CallableRequest):
         "participant": participant_id,
         "parentMessageId": effective_parent_id,
         "childMessageIds": [],
+        "parts": [],
         "timestamp": firestore.SERVER_TIMESTAMP,
-        "run": {
-            "status": "pending",
-            "inputMessage": message_text,
-            "rawStuffedContextItems": stuffed_context_items, # Save raw content for the task
-            "processedArtifacts": [], # Will be populated by the task
-            "outputEvents": [],
-        }
     }
     batch.set(assistant_message_ref, assistant_message_data)
 
