@@ -146,7 +146,8 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     files_to_fetch_meta, processed_paths = [], set()
     try:
         with httpx.Client() as session:
-            list_repo_files_recursive(session, org_user, repo_name, "", auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths)
+            directory = data.get('directory', "")
+            list_repo_files_recursive(session, org_user, repo_name, directory, auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths)
     except Exception as e_list:
         logger.error(f"Critical error during repo file listing for {org_user}/{repo_name}: {e_list}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to list repository files: {str(e_list)}")

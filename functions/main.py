@@ -7,13 +7,6 @@ from firebase_functions.options import RateLimits, RetryConfig
 from common.utils import handle_exceptions_and_log
 import asyncio
 
-# Import the logic functions from their respective handlers
-from handlers.vertex_agent_handler import (
-    _deploy_agent_to_vertex_logic,
-    _delete_vertex_agent_logic,
-    query_deployed_agent_orchestrator_logic as _execute_query_logic,
-    _check_vertex_agent_deployment_status_logic
-)
 from handlers.vertex.task import run_agent_task_wrapper
 from handlers.gofannon_handler import _get_gofannon_tool_manifest_logic
 from handlers.context_handler import (
