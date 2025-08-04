@@ -124,11 +124,42 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true,
         liteLlmModelPrefix: "watsonx", // e.g. watsonx/google/flan-t5-xxl
         models: [
-            // Model IDs are provider/model format
-            { id: "meta-llama/llama-3-1-8b-instruct", name: "Llama 3.1 8B Instruct (WatsonX)", supportedModes: ['text'] },
-            { id: "google/flan-t5-xxl", name: "Google Flan-T5 XXL (WatsonX)", supportedModes: ['text'] },
-            { id: "ibm/granite-13b-chat-v2", name: "IBM Granite 13B Chat v2 (WatsonX)", supportedModes: ['text'] },
-            { id: "meta-llama/llama-4-maverick-17b-128e-instruct-fp8", name: "Llama 4 Maverick 17B 128E Instruct FP8 (WatsonX)", supportedModes: ['text'] },
+            // IBM foundation models
+            { id: "ibm/granite-3-3-8b-instruct", name: "granite-3-3-8b-instruct", supportedModes: ['text'] },
+            { id: "ibm/granite-3-2-8b-instruct", name: "granite-3-2-8b-instruct", supportedModes: ['text'] },
+            { id: "ibm/granite-vision-3-2-2b", name: "granite-vision-3-2-2b", supportedModes: ['text', 'vision'] },
+            { id: "ibm/granite-3-2b-instruct-v3-1", name: "granite-3-2b-instruct (v3.1)", supportedModes: ['text'] },
+            { id: "ibm/granite-3-8b-instruct-v3-1", name: "granite-3-8b-instruct (v3.1)", supportedModes: ['text'] },
+            { id: "ibm/granite-guardian-3-8b-v3-1", name: "granite-guardian-3-8b (v3.1)", supportedModes: ['text'] },
+            { id: "ibm/granite-guardian-3-2b-v3-1", name: "granite-guardian-3-2b (v3.1)", supportedModes: ['text'] },
+            { id: "ibm/granite-13b-instruct", name: "granite-13b-instruct", supportedModes: ['text'] },
+            { id: "ibm/granite-8b-code-instruct", name: "granite-8b-code-instruct", supportedModes: ['code'] },
+            { id: "ibm/granite-8b-japanese", name: "granite-8b-japanese", supportedModes: ['text'] },
+
+            // Meta Llama models
+            { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "llama-4-scout-17b-16e-instruct", supportedModes: ['text', 'multimodal'] },
+            { id: "meta-llama/llama-4-maverick-17b-128e-instruct-fp8", name: "llama-4-maverick-17b-128e-instruct-fp8", supportedModes: ['text', 'multimodal'] },
+            { id: "meta-llama/llama-3-3-70b-instruct", name: "llama-3-3-70b-instruct", supportedModes: ['text'] },
+            { id: "meta-llama/llama-3-2-90b-vision-instruct", name: "llama-3-2-90b-vision-instruct", supportedModes: ['text', 'vision'] },
+            { id: "meta-llama/llama-3-2-11b-vision-instruct", name: "llama-3-2-11b-vision-instruct", supportedModes: ['text', 'vision'] },
+            { id: "meta-llama/llama-guard-3-11b-vision", name: "llama-guard-3-11b-vision", supportedModes: ['text', 'vision'] },
+            { id: "meta-llama/llama-3-2-1b-instruct", name: "llama-3-2-1b-instruct", supportedModes: ['text'] },
+            { id: "meta-llama/llama-3-2-3b-instruct", name: "llama-3-2-3b-instruct", supportedModes: ['text'] },
+            { id: "meta-llama/llama-3-405b-instruct", name: "llama-3-405b-instruct", supportedModes: ['text'] },
+
+            // Mistral models
+            { id: "mistral-ai/mistral-medium-2505", name: "mistral-medium-2505", supportedModes: ['text', 'vision'] },
+            { id: "mistral-ai/mistral-small-3-1-24b-instruct-2503", name: "mistral-small-3-1-24b-instruct-2503", supportedModes: ['text', 'vision'] },
+            { id: "mistral-ai/pixtral-12b", name: "pixtral-12b", supportedModes: ['text', 'vision'] },
+            { id: "mistral-ai/mistral-large-2", name: "mistral-large-2", supportedModes: ['text'] },
+
+            // Third-party foundation models
+            { id: "sdaia/allam-1-13b-instruct", name: "allam-1-13b-instruct", supportedModes: ['text'] },
+            { id: "core42/jais-13b-chat-arabic", name: "jais-13b-chat (Arabic)", supportedModes: ['text'] },
+            { id: "google/flan-t5-xl-3b", name: "flan-t5-xl-3b", supportedModes: ['text'] },
+            { id: "google/flan-t5-xxl-11b", name: "flan-t5-xxl-11b", supportedModes: ['text'] },
+            { id: "google/flan-ul2-20b", name: "flan-ul2-20b", supportedModes: ['text'] },
+            { id: "elyza/elyza-japanese-llama-2-7b-instruct", name: "elyza-japanese-llama-2-7b-instruct", supportedModes: ['text'] },
         ],
         customInstruction: "For IBM WatsonX, ensure WATSONX_URL and WATSONX_APIKEY (or WATSONX_TOKEN) are set in the backend or passed. Model String is the WatsonX model ID (e.g., google/flan-t5-xxl). Also requires WATSONX_PROJECT_ID."
     },
