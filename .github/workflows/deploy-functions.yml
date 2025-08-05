@@ -59,7 +59,7 @@ jobs:
 
       - name: Add environment secrets to .env  
         env:  
-          SECRETS: "OPENAI_API_KEY,DEEPINFRA_API_KEY,GITHUB_TOKEN" # Comma separated list of your secrets  
+          SECRETS: "OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION_NAME,LLAMA_API_KEY,MISTRAL_API_KEY,WATSONX_APIKEY,WATSONX_TOKEN,WATSONX_URL,WATSONX_PROJECT_ID,DEEPSEEK_API_KEY,DEEPINFRA_API_KEY,REPLICATE_API_KEY,TOGETHER_AI_API_KEY,AZURE_API_KEY,AZURE_API_BASE,AZURE_API_VERSION,GITH_TOKEN" # Comma separated list of your secrets
         working-directory: ./functions
         run: |  
           touch .env
