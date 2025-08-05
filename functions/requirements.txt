@@ -1,7 +1,8 @@
 firebase_functions>=0.2.0
 firebase-admin
 google-cloud-aiplatform[adk,agent_engines]==1.98.0
-google-adk>=1.4.2
+# Version pinned until https://github.com/google/adk-python/issues/2361 is resolved
+google-adk==1.7.0
 google-cloud-tasks>=2.15.0
 google-cloud-storage>=2.0.0
 gofannon
