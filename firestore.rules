@@ -31,9 +31,8 @@ service cloud.firestore {
     match /projects/{projectId} {
       // NOTE: For now, any authenticated user can read any project.
       allow get, list: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow create, delete: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
       allow update: if isOwner(resource.data) || isAdmin();
-      allow delete: if isAdmin(); // Only admins can delete projects
     }
 
     // --- Models Collection ---
