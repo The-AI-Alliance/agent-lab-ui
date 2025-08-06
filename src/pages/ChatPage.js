@@ -260,12 +260,28 @@ const ChatPage = () => {
     const sendButtonDisabled = sending || isContextLoading || (composerAction.type === 'text' && !composerValue.trim() && pendingContextParts.length === 0);
 
     return (
-        <Container maxWidth="md" sx={{ py: 3 }}>
+        <Container sx={{ py: 3 }}>
             <Paper sx={{ p: { xs: 2, md: 4 } }}>
                 <Typography variant="h4" gutterBottom>{chat.title}</Typography>
                 {error && <ErrorMessage message={error} />}
 
-                <Box sx={{ bgcolor: 'background.paper', borderRadius: 2, border: '1px solid', borderColor: 'divider', p: 2, minHeight: 320, overflowY: 'auto', maxHeight: '60vh', display: 'flex', flexDirection: 'column' }}>
+                <Box
+                    sx={{
+                        width: '100%',
+                        maxWidth: { xs: '100%', sm: '98%', md: '95%', lg: '90%', xl: '85%' },
+                        mx: 'auto',
+                        bgcolor: 'background.paper',
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        p: 2,
+                        minHeight: 320,
+                        overflowY: 'auto',
+                        maxHeight: '60vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
                     {conversationPath.map((msg) => {
                         const participant = parseParticipant(msg.participant, models, agents, currentUser);
                         const isAssistant = msg.participant?.startsWith('agent') || msg.participant?.startsWith('model');

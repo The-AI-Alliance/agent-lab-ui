@@ -114,14 +114,25 @@ function AppContent() {
             <Navbar />
             <Container
                 component="main"
-                maxWidth="lg"
+                maxWidth={false}           // Disable maxWidth for full width
+                disableGutters={true}      // Remove default padding
                 sx={{
                     mt: { xs: '56px', sm: '64px' },
                     pb: 3,
-                    minHeight: 'calc(100vh - (64px + 24px))'
+                    minHeight: 'calc(100vh - (64px + 24px))',
+                    px: { xs: 2, sm: 3, md: 6, lg: 10, xl: 12 }, // Responsive horizontal padding
+                    // Optionally set a maxWidth on inner container for comfortable reading width
                 }}
             >
-                <Routes>
+                <Box
+                    sx={{
+                        width: '100%',
+                        maxWidth: { xs: '100%', sm: '98%', md: '95%', lg: '90%', xl: '85%' },
+                        mx: 'auto',
+                        // You can add more styles here if needed
+                    }}
+                >
+                    <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/unauthorized" element={<UnauthorizedPage />} />
                     <Route path="/about" element={<AboutPage />} />
@@ -165,6 +176,7 @@ function AppContent() {
                         </Box>
                     } />
                 </Routes>
+                </Box>
             </Container>
         </>
     );
