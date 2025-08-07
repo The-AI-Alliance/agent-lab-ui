@@ -47,35 +47,9 @@ jobs:
       - name: Configure Google ADC  
         run: |  
           mkdir -p ~/.config/gcloud  
-          cp "${{ steps.auth.outputs.credentials_file_path }}" ~/.config/gcloud/application_default_credentials.json 
+          cp "${{ steps.auth.outputs.credentials_file_path }}" ~/.config/gcloud/application_default_credentials.json
 
-      - name: Prepare Python Env
-        working-directory: ./functions
-        run: |
-          python3.11 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Add environment secrets to .env  
-        env:  
-          SECRETS: "OPENAI_API_KEY,DEEPINFRA_API_KEY,GITHUB_TOKEN" # Comma separated list of your secrets  
-        working-directory: ./functions
-        run: |  
-          touch .env
-          for SECRET in $(echo $SECRETS | sed "s/,/ /g")  
-          do  
-            # Check if the secret is GITH_TOKEN and rename it to GITHUB_TOKEN  
-            if [ "$SECRET" = "GITH_TOKEN" ]; then  
-              OUTPUT_SECRET_NAME="GITHUB_TOKEN"  
-            else  
-              OUTPUT_SECRET_NAME="$SECRET"  
-            fi  
-            # Append the secret to the .env file  
-            echo "${OUTPUT_SECRET_NAME}=${!SECRET}" >> .env
-          done
-
-      - name: Deploy Firebase Functions
+      - name: Deploy Rules and Indexes
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
           GOOGLE_CLOUD_PROJECT: ${{ env.PROJECT_ID }}

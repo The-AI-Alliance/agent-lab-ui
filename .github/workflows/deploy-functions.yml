@@ -57,11 +57,31 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Add environment secrets to .env  
-        env:  
-          SECRETS: "OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION_NAME,LLAMA_API_KEY,MISTRAL_API_KEY,WATSONX_APIKEY,WATSONX_TOKEN,WATSONX_URL,WATSONX_PROJECT_ID,DEEPSEEK_API_KEY,DEEPINFRA_API_KEY,REPLICATE_API_KEY,TOGETHER_AI_API_KEY,AZURE_API_KEY,AZURE_API_BASE,AZURE_API_VERSION,GITH_TOKEN" # Comma separated list of your secrets
+      - name: Add environment secrets to .env
+        env:
+          SECRETS: "OPENAI_API_KEY,GEMINI_API_KEY,ANTHROPIC_API_KEY,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION_NAME,LLAMA_API_KEY,MISTRAL_API_KEY,WATSONX_APIKEY,WATSONX_TOKEN,WATSONX_URL,WATSONX_PROJECT_ID,DEEPSEEK_API_KEY,DEEPINFRA_API_KEY,REPLICATE_API_KEY,TOGETHER_AI_API_KEY,AZURE_API_KEY,AZURE_API_BASE,AZURE_API_VERSION,GITH_TOKEN"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION_NAME: ${{ secrets.AWS_REGION_NAME }}
+          LLAMA_API_KEY: ${{ secrets.LLAMA_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          WATSONX_APIKEY: ${{ secrets.WATSONX_APIKEY }}
+          WATSONX_TOKEN: ${{ secrets.WATSONX_TOKEN }}
+          WATSONX_URL: ${{ secrets.WATSONX_URL }}
+          WATSONX_PROJECT_ID: ${{ secrets.WATSONX_PROJECT_ID }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPINFRA_API_KEY: ${{ secrets.DEEPINFRA_API_KEY }}
+          REPLICATE_API_KEY: ${{ secrets.REPLICATE_API_KEY }}
+          TOGETHER_AI_API_KEY: ${{ secrets.TOGETHER_AI_API_KEY }}
+          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+          AZURE_API_BASE: ${{ secrets.AZURE_API_BASE }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+          GITH_TOKEN: ${{ secrets.GITH_TOKEN }}
         working-directory: ./functions
-        run: |  
+        run: |
           touch .env
           for SECRET in $(echo $SECRETS | sed "s/,/ /g")  
           do  
