@@ -10,6 +10,9 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true,
         liteLlmModelPrefix: "openai",
         models: [
+            { id: "gpt-5-2025-08-07", name: "GPT-5 (2025-08-07)", supportedModes: ['text', 'image'] },
+            { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini (2025-08-07)", supportedModes: ['text', 'image']},
+            { id: "gpt-5-Nano-2025-08-07", name: "GPT-5 Nano (2025-08-07)", supportedModes: ['text', 'image']},
             { id: "o3-deep-research-2025-06-26", name: "OpenAI o3 Deep Research (2025-06-26)", supportedModes: ['text', 'image'] },
             { id: "o4-mini-deep-research-2025-06-26", name: "OpenAI o4 Mini Deep Research (2025-06-26)", supportedModes: ['text', 'image'] },
             { id: "o4-mini-2025-04-16", name:"OpenAI o4 Mini (2025-04-16)", supportedModes: ['text', 'image'] },
