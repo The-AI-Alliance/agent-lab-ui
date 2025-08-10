@@ -13,6 +13,8 @@ const clientATheme = createTheme({
             default: '#e8f5e9', // Very light green
             paper: '#ffffff',
         },
+        userChatBubble: '#90EE90',
+        machineChatBubble: '#D3D3D3'
     },
     typography: {
         fontFamily: '"Lato", "Arial", sans-serif', // Different font

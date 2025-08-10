@@ -21,7 +21,9 @@ const carbonTheme = createTheme({
         text: {
             primary: '#161616', // Gray 100
             secondary: '#525252', // Gray 80
-        }
+        },
+        userChatBubble: '#90EE90',
+        machineChatBubble: '#D3D3D3'
     },
     typography: {
         fontFamily: '"IBM Plex Sans", "Helvetica", "Arial", sans-serif',

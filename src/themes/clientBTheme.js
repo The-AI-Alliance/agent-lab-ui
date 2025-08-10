@@ -14,6 +14,8 @@ const clientBTheme = createTheme({
             default: '#121212',
             paper: '#1e1e1e',
         },
+        userChatBubble: '#90EE90',
+        machineChatBubble: '#D3D3D3'
     },
     typography: {
         fontFamily: '"Montserrat", "Verdana", sans-serif',

@@ -17,6 +17,8 @@ const defaultTheme = createTheme({
             default: '#f4f6f8', // A light grey background
             paper: '#ffffff',   // White for cards, paper elements
         },
+        userChatBubble: '#90EE90',
+        machineChatBubble: '#D3D3D3'
     },
     typography: {
         fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
