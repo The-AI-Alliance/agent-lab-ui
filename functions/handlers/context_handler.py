@@ -2,10 +2,11 @@
 import os
 import base64
 import uuid
-import requests
 import httpx
-from google.cloud import storage
 import io
+from google.cloud import storage
+from google.cloud import firestore as gcf
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 from pypdf import PdfReader
 
 from firebase_functions import https_fn
@@ -13,7 +14,14 @@ from common.core import logger
 
 
 # --- Generic GCS Uploader Helper ---
-def _upload_bytes_to_gcs(user_id: str, file_bytes: bytes, file_name: str, mime_type: str, context_type: str):
+def _upload_bytes_to_gcs(
+        user_id: str,
+        file_bytes: bytes,
+        file_name: str,
+        mime_type: str,
+        context_type: str,
+        make_public: bool = False
+):
     """Uploads a byte string to GCS and returns a structured response."""
     logger.info(f"Uploading context file for user {user_id} to GCS: {file_name}, type: {context_type}, mimeType: {mime_type}")
     from common.config import get_gcp_project_config
@@ -32,25 +40,78 @@ def _upload_bytes_to_gcs(user_id: str, file_bytes: bytes, file_name: str, mime_t
         blob = bucket.blob(blob_path)
 
         blob.upload_from_string(file_bytes, content_type=mime_type)
-        # No need to make public, we will use signed URLs or direct GCS access
+
+        public_url = None
+        if make_public:
+            try:
+                blob.make_public()
+                public_url = blob.public_url
+                logger.info(f"Made blob public at URL: {public_url}")
+            except Exception as e:
+                logger.warning(f"Failed to make blob public: {e}")
 
         storage_uri = f"gs://{bucket.name}/{blob.name}"
         logger.info(f"Context file for user {user_id} uploaded to {storage_uri}.")
-        return {"success": True, "name": file_name, "storageUrl": storage_uri, "type": context_type, "mimeType": mime_type}
+        return {
+            "success": True,
+            "name": file_name,
+            "storageUrl": storage_uri,
+            "type": context_type,
+            "mimeType": mime_type,
+            "publicUrl": public_url
+        }
     except Exception as e:
         logger.error(f"Error during GCS upload for user {user_id}: {e}", exc_info=True)
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to upload context file: {e}")
 
 
-    # --- Web Page Fetching ---
+def _create_context_message(
+        user_id: str,
+        chat_id: str,
+        parent_message_id: str,
+        file_uri: str,
+        mime_type: str,
+        preview_map: dict
+) -> str:
+    """Create a 'context_stuffed' message in Firestore and return its ID."""
+    try:
+        db = gcf.Client()
+        messages = db.collection("chats").document(chat_id).collection("messages")
+        data = {
+            "participant": "context_stuffed",
+            "parts": [{
+                "file_data": {
+                    "file_uri": file_uri,
+                    "mime_type": mime_type
+                },
+                "preview": preview_map
+            }],
+            "parentMessageId": parent_message_id,
+            "timestamp": SERVER_TIMESTAMP,
+            "createdBy": f"user:{user_id}"
+        }
+        doc_ref = messages.document()
+        doc_ref.set(data)
+        logger.info(f"Created context message {doc_ref.id} in chat {chat_id}")
+        return doc_ref.id
+    except Exception as e:
+        logger.error(f"Failed to create context message in Firestore: {e}", exc_info=True)
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to create context message: {e}")
+
+
+# --- Web Page Fetching ---
 def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
     logger.info(f"[_fetch_web_page_content_logic] Function called with data keys: {list(req.data.keys()) if isinstance(req.data, dict) else 'Non-dict data'}")
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
 
     url = req.data.get("url")
+    chat_id = req.data.get("chatId")
+    parent_message_id = req.data.get("parentMessageId")
     if not url:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="URL is required.")
+    if not chat_id:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="chatId is required.")
 
     try:
         headers = {'User-Agent': 'AgentLab-ContextFetcher/1.0'}
@@ -62,19 +123,44 @@ def _fetch_web_page_content_logic(req: https_fn.CallableRequest):
             mime_type = response.headers.get('Content-Type', 'text/plain; charset=utf-8').split(';')[0]
             file_name_from_url = url.split('/')[-1] or "webpage.html"
         logger.info(f"Fetched web page content from {url}, size: {len(raw_content_bytes)} bytes, mimeType: {mime_type}")
-        return _upload_bytes_to_gcs(
+
+        # Create a text preview (first 1000 chars)
+        try:
+            preview_text = raw_content_bytes.decode('utf-8', errors='ignore')[:1000]
+        except Exception:
+            preview_text = ""
+
+        upload_result = _upload_bytes_to_gcs(
             user_id=req.auth.uid,
             file_bytes=raw_content_bytes,
             file_name=file_name_from_url,
             mime_type=mime_type,
-            context_type='webpage'
+            context_type='webpage',
+            make_public=False
         )
+
+        preview_map = {"type": "text", "value": preview_text}
+        message_id = _create_context_message(
+            user_id=req.auth.uid,
+            chat_id=chat_id,
+            parent_message_id=parent_message_id,
+            file_uri=upload_result["storageUrl"],
+            mime_type=upload_result["mimeType"],
+            preview_map=preview_map
+        )
+
+        return {
+            **upload_result,
+            "success": True,
+            "messageId": message_id,
+            "preview": preview_map
+        }
     except httpx.RequestError as err:
         logger.error(f"Error fetching web page {url}: {err}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to fetch web page: {str(err)}")
 
 
-    # --- Git Repository Fetching ---
+# --- Git Repository Fetching ---
 GITHUB_API_BASE = "https://api.github.com"
 NEW_FILE_SEPARATOR = "\n\n---<newfile>--\n\n"
 
@@ -139,8 +225,12 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
     data = req.data
     org_user, repo_name = data.get("orgUser"), data.get("repoName")
+    chat_id = data.get("chatId")
+    parent_message_id = data.get("parentMessageId")
     if not org_user or not repo_name:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Organization/User and Repository Name are required.")
+    if not chat_id:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="chatId is required.")
 
     auth_token = data.get("gitToken") or get_github_token()
     files_to_fetch_meta, processed_paths = [], set()
@@ -175,19 +265,46 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     monolithic_content = NEW_FILE_SEPARATOR.join(content_chunks)
     file_name = f"clone_{org_user}_{repo_name}.txt"
     logger.info(f"Fetched {len(files_to_fetch_meta)} files from {org_user}/{repo_name}, total content size: {total_content_size} bytes.")
-    return _upload_bytes_to_gcs(
+
+    upload_result = _upload_bytes_to_gcs(
         user_id=req.auth.uid,
         file_bytes=monolithic_content.encode('utf-8'),
         file_name=file_name,
         mime_type='text/plain',
-        context_type='git_repo'
+        context_type='git_repo',
+        make_public=False
     )
+
+    # Preview: list of all files separated by line carriage (newline)
+    preview_list = "\n".join([meta["path"] for meta in files_to_fetch_meta])
+    preview_map = {"type": "file_list", "value": preview_list}
+
+    message_id = _create_context_message(
+        user_id=req.auth.uid,
+        chat_id=chat_id,
+        parent_message_id=parent_message_id,
+        file_uri=upload_result["storageUrl"],
+        mime_type=upload_result["mimeType"],
+        preview_map=preview_map
+    )
+
+    return {
+        **upload_result,
+        "success": True,
+        "messageId": message_id,
+        "preview": preview_map
+    }
 
 # --- PDF Processing ---
 def _process_pdf_content_logic(req: https_fn.CallableRequest):
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
     url, file_data_base64, file_name_from_client = req.data.get("url"), req.data.get("fileData"), req.data.get("fileName")
+    chat_id = req.data.get("chatId")
+    parent_message_id = req.data.get("parentMessageId")
+    if not chat_id:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="chatId is required.")
+
     pdf_bytes, pdf_source_name = None, "Uploaded PDF"
     if url:
         pdf_source_name = url.split('/')[-1]
@@ -217,41 +334,86 @@ def _process_pdf_content_logic(req: https_fn.CallableRequest):
         if len(text_content) > MAX_PDF_CONTENT_LENGTH:
             text_content = text_content[:MAX_PDF_CONTENT_LENGTH] + "\n... [PDF CONTENT TRUNCATED]"
         logger.info(f"Extracted {len(text_content)} characters from PDF: {pdf_source_name}")
-        return _upload_bytes_to_gcs(
+
+        # Preview is first 1000 characters of extracted text
+        preview_text = (text_content or "")[:1000]
+
+        upload_result = _upload_bytes_to_gcs(
             user_id=req.auth.uid,
             file_bytes=text_content.encode('utf-8'),
             file_name=f"{os.path.splitext(pdf_source_name)[0]}.txt",
             mime_type='text/plain',
-            context_type='pdf'
+            context_type='pdf',
+            make_public=False
         )
+
+        preview_map = {"type": "text", "value": preview_text}
+        message_id = _create_context_message(
+            user_id=req.auth.uid,
+            chat_id=chat_id,
+            parent_message_id=parent_message_id,
+            file_uri=upload_result["storageUrl"],
+            mime_type=upload_result["mimeType"],
+            preview_map=preview_map
+        )
+
+        return {
+            **upload_result,
+            "success": True,
+            "messageId": message_id,
+            "preview": preview_map
+        }
     except Exception as e:
         if "encrypted" in str(e).lower():
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.FAILED_PRECONDITION, message="PDF is encrypted and cannot be processed.")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to process PDF: {str(e)}")
 
-    # --- Image Upload ---
+# --- Image Upload ---
 def _upload_image_and_get_uri_logic(req: https_fn.CallableRequest):
     if not req.auth:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="Authentication required.")
     data = req.data
-    file_data_base64, file_name, mime_type, user_id = data.get("fileData"), data.get("fileName"), data.get("mimeType"), req.auth.uid
+    file_data_base64, file_name, mime_type = data.get("fileData"), data.get("fileName"), data.get("mimeType")
+    chat_id = data.get("chatId")
+    parent_message_id = data.get("parentMessageId")
+    user_id = req.auth.uid
     if not all([file_data_base64, file_name, mime_type, user_id]):
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Missing required fields: fileData, fileName, mimeType.")
+    if not chat_id:
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="chatId is required.")
     try:
         image_bytes = base64.b64decode(file_data_base64)
-        return _upload_bytes_to_gcs(
+        upload_result = _upload_bytes_to_gcs(
             user_id=user_id,
             file_bytes=image_bytes,
             file_name=file_name,
             mime_type=mime_type,
-            context_type='image'
+            context_type='image',
+            make_public=True  # Make image public for preview
         )
+        # Preview should be the public URL of the image
+        preview_map = {"type": "image_url", "value": upload_result.get("publicUrl")}
+        message_id = _create_context_message(
+            user_id=user_id,
+            chat_id=chat_id,
+            parent_message_id=parent_message_id,
+            file_uri=upload_result["storageUrl"],
+            mime_type=upload_result["mimeType"],
+            preview_map=preview_map
+        )
+
+        return {
+            **upload_result,
+            "success": True,
+            "messageId": message_id,
+            "preview": preview_map
+        }
     except Exception as e:
         logger.error(f"Error processing image upload for user {user_id}: {e}", exc_info=True)
-        # The helper will raise the HttpsError
+        # The helper will raise the HttpsError as needed
         raise
 
-    # This __all__ list makes the functions importable by main.py
+# This __all__ list makes the functions importable by main.py
 __all__ = [
     '_fetch_web_page_content_logic',
     '_fetch_git_repo_contents_logic',

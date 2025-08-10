@@ -1,5 +1,4 @@
 // src/pages/ChatPage.js
-// src/pages/ChatPage.js
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,7 +8,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import {
     Container, Typography, Box, Paper, Button, TextField, Menu, MenuItem,
-    Avatar, ButtonGroup, ListSubheader, Divider, CircularProgress, Chip
+    Avatar, ButtonGroup, ListSubheader, Divider, CircularProgress
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import PersonIcon from '@mui/icons-material/Person';
@@ -19,7 +18,6 @@ import MessageActions from '../components/chat/MessageActions';
 import AgentReasoningLogDialog from '../components/agents/AgentReasoningLogDialog';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import AttachmentIcon from '@mui/icons-material/Attachment';
-import CancelIcon from '@mui/icons-material/Cancel';
 
 // Markdown Imports
 import ReactMarkdown from 'react-markdown';
@@ -94,41 +92,46 @@ function findLeafOfBranch(messagesMap, branchRootId) {
     }
 }
 
-const convertFileDataToContextItem = (file_data) => {
-    const uri = file_data?.file_uri || '';
-    const mime = file_data?.mime_type || '';
-    const name = uri.split('/').pop() || 'Attachment';
-    let type = 'file';
-    if (mime.startsWith('image/')) type = 'image';
-    else if (mime.includes('pdf')) type = 'pdf';
-    return {
-        name,
-        type,
-        bytes: null,
-        content: null,
-        signedUrl: uri,
-        mimeType: mime
-    };
+const convertPartToContextItem = (part) => {
+    if (!part) return null;
+    if (part.file_data) {
+        const uri = part.file_data?.file_uri || '';
+        const mime = part.file_data?.mime_type || '';
+        const name = uri.split('/').pop() || 'Attachment';
+        let type = 'file';
+        if (mime.startsWith('image/')) type = 'image';
+        else if (mime.includes('pdf')) type = 'pdf';
+        return {
+            name,
+            type,
+            bytes: null,
+            content: null,
+            signedUrl: uri,
+            mimeType: mime,
+            preview: part.preview || null
+        };
+    }
+    if (part.text) {
+        return {
+            name: 'Text Context',
+            type: 'text',
+            content: part.text,
+            bytes: null,
+            signedUrl: null,
+            mimeType: 'text/plain',
+            preview: part.preview || null
+        };
+    }
+    return null;
 };
 
 const extractContextItemsFromMessage = (msg) => {
-    // Prefer parts if this is a context message; convert the parts into items understood by the bubble/dialog
+    // For context messages, convert each part (including preview if present)
     if (msg?.participant === 'context_stuffed') {
         if (Array.isArray(msg.parts) && msg.parts.length > 0) {
             return msg.parts
-                .filter(p => p.file_data || p.text)
-                .map(p => {
-                    if (p.file_data) return convertFileDataToContextItem(p.file_data);
-                    // Fallback for text context (rare): show as text content item
-                    return {
-                        name: 'Text Context',
-                        type: 'text',
-                        content: p.text,
-                        bytes: null,
-                        signedUrl: null,
-                        mimeType: 'text/plain'
-                    };
-                });
+                .map(convertPartToContextItem)
+                .filter(Boolean);
         }
     }
     // Backward compatibility fallbacks (older fields)
@@ -160,7 +163,6 @@ const ChatPage = () => {
     const [loadingEvents, setLoadingEvents] = useState(false);
 
     // --- New Context State ---
-    const [pendingContextParts, setPendingContextParts] = useState([]);
     const [contextModalType, setContextModalType] = useState(null);
     const [isContextModalOpen, setIsContextModalOpen] = useState(false);
     const [isContextLoading, setIsContextLoading] = useState(false);
@@ -241,32 +243,11 @@ const ChatPage = () => {
         handleCloseMenu();
     };
 
-    // Persist each pending context item as its own "context_stuffed" message and return the last new message id (or original parent if none)
-    const persistPendingContextAndGetNewParent = async (parentMessageId) => {
-        let currentParent = parentMessageId;
-        for (const part of pendingContextParts) {
-            const newId = await addChatMessage(chatId, {
-                participant: 'context_stuffed',
-                // IMPORTANT: store as "parts" (file_data) for Firestore schema compatibility
-                parts: [{ file_data: part.file_data }],
-                parentMessageId: currentParent
-            });
-            currentParent = newId;
-        }
-        return currentParent;
-    };
-
     const handleActionSubmit = async (e) => {
         e.preventDefault();
         setSending(true);
         setError(null);
         try {
-            // First, persist pending context as dedicated context messages (bubbles)
-            let parentForNext = activeLeafMsgId;
-            if (pendingContextParts.length > 0) {
-                parentForNext = await persistPendingContextAndGetNewParent(activeLeafMsgId);
-            }
-
             if (composerAction.type === 'text') {
                 const trimmed = composerValue.trim();
                 if (trimmed.length > 0) {
@@ -274,21 +255,18 @@ const ChatPage = () => {
                     await addChatMessage(chatId, {
                         participant: `user:${currentUser.uid}`,
                         parts: finalParts,
-                        parentMessageId: parentForNext
+                        parentMessageId: activeLeafMsgId
                     });
                     setComposerValue('');
                 }
-                setPendingContextParts([]);
             } else if (composerAction.type === 'agent' || composerAction.type === 'model') {
                 await executeQuery({
                     chatId,
                     agentId: composerAction.type === 'agent' ? composerAction.id : undefined,
                     modelId: composerAction.type === 'model' ? composerAction.id : undefined,
                     adkUserId: currentUser.uid,
-                    parentMessageId: parentForNext,
-                    stuffedContextItems: pendingContextParts.length > 0 ? pendingContextParts : null
+                    parentMessageId: activeLeafMsgId
                 });
-                setPendingContextParts([]);
             }
         } catch (err) { setError(err.message); } finally { setSending(false); }
     };
@@ -305,25 +283,23 @@ const ChatPage = () => {
         handleCloseContextModal();
         try {
             let result;
-            if (params.type === 'webpage') result = await fetchWebPageContent(params.url);
-            else if (params.type === 'gitrepo') result = await fetchGitRepoContents(params);
-            else if (params.type === 'pdf') result = await processPdfContent(params);
-            else if (params.type === 'image') result = await uploadImageForContext(params.file);
-            else throw new Error("Unknown context type");
-
-            if (result.success) {
-                setPendingContextParts(prev => [...prev, {
-                    name: result.name,
-                    file_data: { file_uri: result.storageUrl, mime_type: result.mimeType }
-                }]);
+            if (params.type === 'webpage') {
+                result = await fetchWebPageContent({ url: params.url, chatId, parentMessageId: activeLeafMsgId });
+            } else if (params.type === 'gitrepo') {
+                result = await fetchGitRepoContents({ ...params, chatId, parentMessageId: activeLeafMsgId });
+            } else if (params.type === 'pdf') {
+                result = await processPdfContent({ ...params, chatId, parentMessageId: activeLeafMsgId });
+            } else if (params.type === 'image') {
+                result = await uploadImageForContext({ file: params.file, chatId, parentMessageId: activeLeafMsgId });
             } else {
-                throw new Error(result.message || "Failed to process context item.");
+                throw new Error("Unknown context type");
             }
-        } catch (err) { setError(`Failed to add context: ${err.message}`); } finally { setIsContextLoading(false); }
-    };
 
-    const removePendingContextPart = (index) => {
-        setPendingContextParts(prev => prev.filter((_, i) => i !== index));
+            if (!result?.success) {
+                throw new Error(result?.message || "Failed to process context item.");
+            }
+            // No need to handle local state; the backend creates the context message and the listener will update the UI.
+        } catch (err) { setError(`Failed to add context: ${err.message}`); } finally { setIsContextLoading(false); }
     };
 
     // Context details dialog open helper
@@ -357,7 +333,7 @@ const ChatPage = () => {
     if (loading || !chat) return <Box sx={{ display: 'flex', justifyContent: 'center' }}><LoadingSpinner /></Box>;
     if (error && !conversationPath.length) return <ErrorMessage message={error} />;
 
-    const sendButtonDisabled = sending || isContextLoading || (composerAction.type === 'text' && !composerValue.trim() && pendingContextParts.length === 0);
+    const sendButtonDisabled = sending || isContextLoading || (composerAction.type === 'text' && !composerValue.trim());
 
     return (
         <Container sx={{ py: 3 }}>
@@ -434,7 +410,7 @@ const ChatPage = () => {
 
                                         {/* Render each legacy file_data as its own context bubble below the message */}
                                         {fileDataParts.map((part, idx) => {
-                                            const item = convertFileDataToContextItem(part.file_data);
+                                            const item = convertPartToContextItem(part);
                                             const openDetails = () => {
                                                 setContextDetailsItems([item]);
                                                 setContextDetailsOpen(true);
@@ -466,21 +442,6 @@ const ChatPage = () => {
                     })}
                     <div ref={chatEndRef} />
                 </Box>
-
-                {pendingContextParts.length > 0 && (
-                    <Box sx={{ mt: 2, p: 1, border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
-                        <Typography variant="caption" color="text.secondary">Pending attachments:</Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                            {pendingContextParts.map((part, index) => (
-                                <Chip
-                                    key={index} icon={<AttachmentIcon />} label={part.name}
-                                    onDelete={() => removePendingContextPart(index)}
-                                    deleteIcon={<CancelIcon />}
-                                />
-                            ))}
-                        </Box>
-                    </Box>
-                )}
 
                 <Box component="form" onSubmit={handleActionSubmit} sx={{ display: 'flex', alignItems: 'flex-end', mt: 2, gap: 1 }}>
                     {composerAction.type === 'text' && (
