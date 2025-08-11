@@ -97,6 +97,8 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true,
         liteLlmModelPrefix: "meta_llama",
         models: [
+            { id: "Llama-4-Maverick-17B-128E-Instruct-FP8", name: "Llama 4 Maverick 17B Instruct FP8", supportedModes: ['text', 'image'] },
+            { id: "Llama-4-Scout-17B-16E-Instruct-FP8", name: "Llama 4 Scout 17B Instruct FP8", supportedModes: ['text', 'image'] },
             { id: "Llama-3.3-70B-Instruct", name: "Llama 3.3 70B Instruct", supportedModes: ['text']},
             { id: "Llama-3.3-8B-Instruct", name: "Llama 3.3 8B Instruct", supportedModes: ['text']},
             // Add other specific model versions if needed
