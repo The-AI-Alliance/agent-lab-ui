@@ -4,5 +4,6 @@
   "googleAnalyticsId": "G-8HVML63Z74",
   "features": {
     "gdprCookieConsent": true
-  }
+  },
+  "theme" : "default"
 }

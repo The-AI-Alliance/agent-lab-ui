@@ -4,19 +4,21 @@ import CssBaseline from '@mui/material/CssBaseline';
 import defaultTheme from '../themes/defaultTheme';
 import clientATheme from '../themes/clientATheme';
 import clientBTheme from '../themes/clientBTheme';
-import carbonTheme from '../themes/carbonTheme'; 
+import carbonTheme from '../themes/carbonTheme';
+import { useConfig } from './ConfigContext';
 
 const ThemeContext = createContext({
     toggleThemeMode: () => {}, // if you want light/dark toggle within a theme
     selectTheme: () => {},
     currentThemeKey: 'default',
+    isThemeFixedByConfig: false, // New flag
 });
 
 export const availableThemes = {
     default: defaultTheme,
     clientA: clientATheme,
     clientB: clientBTheme,
-    carbon: carbonTheme, 
+    carbon: carbonTheme,
 };
 
 export const getThemeByHostname = () => {
@@ -45,13 +47,36 @@ export const getThemeByHostname = () => {
 };
 
 export const CustomThemeProvider = ({ children }) => {
-    const [themeKey, setThemeKey] = useState(getThemeByHostname());
+    const { config } = useConfig();
+
+    // Determine if theme is fixed by config
+    const configThemeKey = config?.theme;
+    const isConfigThemeValid = configThemeKey && availableThemes.hasOwnProperty(configThemeKey);
+
+    // If config theme is valid, use it exclusively, else fallback to previous logic
+    const initialThemeKey = isConfigThemeValid ? configThemeKey : getThemeByHostname();
+
+    const [themeKey, setThemeKey] = useState(initialThemeKey);
+    // We want to keep themeKey in sync if config.theme changes (and is valid)
+    useEffect(() => {
+        if (isConfigThemeValid) {
+            setThemeKey(configThemeKey);
+        }
+    }, [configThemeKey, isConfigThemeValid]);
 
     useEffect(() => {
-        localStorage.setItem('selectedThemeKey', themeKey);
-    }, [themeKey]);
+        // Only persist theme if not fixed by config
+        if (!isConfigThemeValid) {
+            localStorage.setItem('selectedThemeKey', themeKey);
+        }
+    }, [themeKey, isConfigThemeValid]);
 
     const selectTheme = (key) => {
+        if (isConfigThemeValid) {
+            // Ignore attempts to change theme if fixed by config
+            console.warn("Theme is fixed by appConfig.json and cannot be changed.");
+            return;
+        }
         if (availableThemes[key]) {
             setThemeKey(key);
         } else {
@@ -64,18 +89,8 @@ export const CustomThemeProvider = ({ children }) => {
         return createTheme(availableThemes[themeKey] || defaultTheme);
     }, [themeKey]);
 
-    // Example: if a theme supports light/dark mode itself
-    // const toggleThemeMode = () => {
-    //   setThemeKey(prev => {
-    //     const currentIsDark = availableThemes[prev]?.palette?.mode === 'dark';
-    //     // This logic would need to be more sophisticated if themes have different base modes
-    //     // For simplicity, this example doesn't implement intra-theme mode toggling
-    //     return prev;
-    //   });
-    // };
-
     return (
-        <ThemeContext.Provider value={{ selectTheme, currentThemeKey: themeKey }}>
+        <ThemeContext.Provider value={{ selectTheme, currentThemeKey: themeKey, isThemeFixedByConfig: isConfigThemeValid }}>
             <MuiThemeProvider theme={activeTheme}>
                 <CssBaseline /> {/* Normalizes styles and applies background from theme */}
                 {children}

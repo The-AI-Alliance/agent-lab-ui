@@ -21,7 +21,7 @@ import InfoIcon from "@mui/icons-material/Info";
 
 const Navbar = () => {
     const { currentUser, logout } = useAuth();
-    const { selectTheme } = useThemeSwitcher();
+    const { selectTheme, isThemeFixedByConfig } = useThemeSwitcher();
     const navigate = useNavigate();
     const location = useLocation();
     const muiTheme = useTheme();
@@ -102,27 +102,31 @@ const Navbar = () => {
                 <Box sx={{ flexGrow: 1, display: { xs: 'block', sm: 'none' } }} />
 
 
-                <Button
-                    aria-controls="theme-menu"
-                    aria-haspopup="true"
-                    onClick={handleThemeMenuOpen}
-                    color="inherit"
-                    startIcon={muiTheme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-                >
-                    Theme
-                </Button>
-                <Menu
-                    id="theme-menu"
-                    anchorEl={themeMenuAnchorEl}
-                    keepMounted
-                    open={Boolean(themeMenuAnchorEl)}
-                    onClose={handleThemeMenuClose}
-                >
-                    <MenuItem onClick={() => handleSelectTheme('default')}>Default</MenuItem>
-                    <MenuItem onClick={() => handleSelectTheme('clientA')}>Client A</MenuItem>
-                    <MenuItem onClick={() => handleSelectTheme('clientB')}>Client B</MenuItem>
-                    <MenuItem onClick={() => handleSelectTheme('carbon')}>Carbon</MenuItem>
-                </Menu>
+                {!isThemeFixedByConfig && (
+                    <>
+                        <Button
+                            aria-controls="theme-menu"
+                            aria-haspopup="true"
+                            onClick={handleThemeMenuOpen}
+                            color="inherit"
+                            startIcon={muiTheme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+                        >
+                            Theme
+                        </Button>
+                        <Menu
+                            id="theme-menu"
+                            anchorEl={themeMenuAnchorEl}
+                            keepMounted
+                            open={Boolean(themeMenuAnchorEl)}
+                            onClose={handleThemeMenuClose}
+                        >
+                            <MenuItem onClick={() => handleSelectTheme('default')}>Default</MenuItem>
+                            <MenuItem onClick={() => handleSelectTheme('clientA')}>Client A</MenuItem>
+                            <MenuItem onClick={() => handleSelectTheme('clientB')}>Client B</MenuItem>
+                            <MenuItem onClick={() => handleSelectTheme('carbon')}>Carbon</MenuItem>
+                        </Menu>
+                    </>
+                )}
 
                 {currentUser ? (
                     <>
