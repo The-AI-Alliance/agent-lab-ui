@@ -364,6 +364,9 @@ const ChatPage = () => {
                         const isContextMessage = msg.participant === 'context_stuffed';
                         const fileDataParts = (msg.parts || []).filter(p => p.file_data);
 
+                        // Derive pseudo-status: for assistant messages only, missing status means 'initializing'
+                        const messageStatus = isAssistant ? (msg.status != null ? msg.status : 'initializing') : msg.status;
+
                         return (
                             <Box key={msg.id} sx={{ position: 'relative', mb: 1, mt: 'auto' }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -377,59 +380,70 @@ const ChatPage = () => {
                                         onOpenDetails={() => openContextDetailsForMessage(msg)}
                                     />
                                 ) : (
-                                    <>
-                                        <Paper
-                                            sx={{
-                                                p: 1.5,
-                                                wordBreak: 'break-word',
-                                                whiteSpace: 'pre-wrap',
-                                                mb: 0.5,
-                                                borderRadius: 2,
-                                                ...getBubbleSxForMessage(msg),
-                                            }}
-                                        >
-                                            {(msg.parts || []).map((part, index) => {
+                                    <Paper
+                                        sx={{
+                                            p: 1.5,
+                                            wordBreak: 'break-word',
+                                            whiteSpace: 'pre-wrap',
+                                            mb: 0.5,
+                                            borderRadius: 2,
+                                            ...getBubbleSxForMessage(msg),
+                                        }}
+                                    >
+                                        {messageStatus === 'initializing' ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <LoadingSpinner small />
+                                                <Typography variant="caption" sx={{ ml: 1 }}>
+                                                    Initializing…
+                                                </Typography>
+                                            </Box>
+                                        ) : messageStatus === 'running' ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <LoadingSpinner small />
+                                                <Typography variant="caption" sx={{ ml: 1 }}>
+                                                    Thinking…
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            (msg.parts || []).map((part, index) => {
                                                 if (part.text) {
-                                                    return <ReactMarkdown key={index} components={muiMarkdownComponentsConfig} remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>;
+                                                    return (
+                                                        <ReactMarkdown
+                                                            key={index}
+                                                            components={muiMarkdownComponentsConfig}
+                                                            remarkPlugins={[remarkGfm]}
+                                                        >
+                                                            {part.text}
+                                                        </ReactMarkdown>
+                                                    );
                                                 }
                                                 // do not render file_data chips inside the user's/assistant's message anymore
                                                 return null;
-                                            })}
-                                            {msg.status === 'running' && (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                                                    <LoadingSpinner small />
-                                                    <Typography variant="caption" sx={{ ml: 1 }}>Thinking...</Typography>
-                                                </Box>
-                                            )}
-                                            {msg.status === 'error' && (
-                                                <Box sx={{ mt: 1 }}>
-                                                    <ErrorMessage message={(msg.errorDetails || []).join('\n')} severity="warning" />
-                                                </Box>
-                                            )}
-                                        </Paper>
-
-                                        {/* Render each legacy file_data as its own context bubble below the message */}
-                                        {fileDataParts.map((part, idx) => {
-                                            const item = convertPartToContextItem(part);
-                                            const openDetails = () => {
-                                                setContextDetailsItems([item]);
-                                                setContextDetailsOpen(true);
-                                            };
-                                            return (
-                                                <Box key={`${msg.id}-ctx-${idx}`} sx={{ mb: 0.5 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                                        <AttachmentIcon color="info" />
-                                                        <Typography variant="subtitle2">Context</Typography>
-                                                    </Box>
-                                                    <ContextDisplayBubble
-                                                        contextMessage={{ items: [item] }}
-                                                        onOpenDetails={openDetails}
-                                                    />
-                                                </Box>
-                                            );
-                                        })}
-                                    </>
+                                            })
+                                        )}
+                                    </Paper>
                                 )}
+
+                                {/* Render each legacy file_data as its own context bubble below the message */}
+                                {fileDataParts.map((part, idx) => {
+                                    const item = convertPartToContextItem(part);
+                                    const openDetails = () => {
+                                        setContextDetailsItems([item]);
+                                        setContextDetailsOpen(true);
+                                    };
+                                    return (
+                                        <Box key={`${msg.id}-ctx-${idx}`} sx={{ mb: 0.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                                <AttachmentIcon color="info" />
+                                                <Typography variant="subtitle2">Context</Typography>
+                                            </Box>
+                                            <ContextDisplayBubble
+                                                contextMessage={{ items: [item] }}
+                                                onOpenDetails={openDetails}
+                                            />
+                                        </Box>
+                                    );
+                                })}
 
                                 <MessageActions
                                     message={msg} messagesMap={messagesMap} activePath={conversationPath}
