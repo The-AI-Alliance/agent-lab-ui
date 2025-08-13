@@ -167,20 +167,20 @@ NEW_FILE_SEPARATOR = "\n\n---<newfile>--\n\n"
 def get_github_token():
     return os.environ.get("GITHUB_TOKEN")
 
-def fetch_repo_file_content(session: httpx.Client, owner, repo, path, token):
+def fetch_repo_file_content(session: httpx.Client, owner, repo, path, token, branch):
     headers = {"Accept": "application/vnd.github.v3.raw"}
     if token:
         headers["Authorization"] = f"token {token}"
-    file_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents/{path}"
+    file_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents/{path}?ref={branch}"
     try:
         response = session.get(file_url, headers=headers, timeout=15)
         response.raise_for_status()
         return response.text
     except httpx.RequestError as e:
-        logger.warn(f"Failed to fetch content for {path} in {owner}/{repo}: {e}")
+        logger.warn(f"Failed to fetch content for {path} in {owner}/{repo} branch {branch}: {e}")
         return None
 
-def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, include_ext, exclude_ext, files_list, processed_paths, depth=0):
+def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, include_ext, exclude_ext, files_list, processed_paths, branch, depth=0):
     if depth > 10:
         logger.warn(f"Max recursion depth reached for path: '{path}' in {owner}/{repo}")
         return
@@ -191,14 +191,13 @@ def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, i
     if token:
         headers["Authorization"] = f"token {token}"
     contents_url_path_part = f"/{path.strip('/')}" if path.strip('/') else ""
-    contents_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents{contents_url_path_part}"
+    contents_url = f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents{contents_url_path_part}?ref={branch}"
     try:
         response = session.get(contents_url, headers=headers, timeout=20)
         response.raise_for_status()
         contents = response.json()
         if not isinstance(contents, list): return
 
-        tasks = []
         for item in contents:
             if len(files_list) >= MAX_FILES_PER_REPO: break
             item_path, item_type, item_name = item.get("path"), item.get("type"), item.get("name")
@@ -211,12 +210,11 @@ def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, i
                 if should_include:
                     files_list.append({"path": item_path, "name": item_name})
             elif item_type == "dir":
-                task = list_repo_files_recursive(session, owner, repo, item_path, token, include_ext, exclude_ext, files_list, processed_paths, depth + 1)
-                tasks.append(task)
+                list_repo_files_recursive(session, owner, repo, item_path, token, include_ext, exclude_ext, files_list, processed_paths, branch, depth + 1)
 
     except httpx.HTTPStatusError as e:
         if e.response is not None and e.response.status_code == 404:
-            logger.warn(f"Directory/path '{path}' not found in {owner}/{repo} (404).")
+            logger.warn(f"Directory/path '{path}' not found in {owner}/{repo} branch {branch} (404).")
             return
         raise
 
@@ -227,6 +225,7 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     org_user, repo_name = data.get("orgUser"), data.get("repoName")
     chat_id = data.get("chatId")
     parent_message_id = data.get("parentMessageId")
+    branch = data.get("branch") or "main"
     if not org_user or not repo_name:
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Organization/User and Repository Name are required.")
     if not chat_id:
@@ -237,9 +236,9 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     try:
         with httpx.Client() as session:
             directory = data.get('directory', "")
-            list_repo_files_recursive(session, org_user, repo_name, directory, auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths)
+            list_repo_files_recursive(session, org_user, repo_name, directory, auth_token, data.get("includeExt", []), data.get("excludeExt", []), files_to_fetch_meta, processed_paths, branch)
     except Exception as e_list:
-        logger.error(f"Critical error during repo file listing for {org_user}/{repo_name}: {e_list}")
+        logger.error(f"Critical error during repo file listing for {org_user}/{repo_name} branch {branch}: {e_list}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=f"Failed to list repository files: {str(e_list)}")
 
     if not files_to_fetch_meta:
@@ -248,8 +247,10 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
     content_chunks = []
     total_content_size, MAX_TOTAL_CONTENT_SIZE = 0, 5 * 1024 * 1024
     with httpx.Client() as session:
-        fetch_tasks = [fetch_repo_file_content(session, org_user, repo_name, file_meta["path"], auth_token) for file_meta in files_to_fetch_meta]
-        fetched_contents = fetch_tasks
+        fetched_contents = []
+        for file_meta in files_to_fetch_meta:
+            content = fetch_repo_file_content(session, org_user, repo_name, file_meta["path"], auth_token, branch)
+            fetched_contents.append(content)
 
     for i, content in enumerate(fetched_contents):
         file_meta = files_to_fetch_meta[i]
@@ -264,7 +265,7 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
 
     monolithic_content = NEW_FILE_SEPARATOR.join(content_chunks)
     file_name = f"clone_{org_user}_{repo_name}.txt"
-    logger.info(f"Fetched {len(files_to_fetch_meta)} files from {org_user}/{repo_name}, total content size: {total_content_size} bytes.")
+    logger.info(f"Fetched {len(files_to_fetch_meta)} files from {org_user}/{repo_name} branch {branch}, total content size: {total_content_size} bytes.")
 
     upload_result = _upload_bytes_to_gcs(
         user_id=req.auth.uid,

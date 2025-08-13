@@ -19,9 +19,9 @@ export const fetchWebPageContent = async ({ url, chatId, parentMessageId }) => {
     }
 };
 
-export const fetchGitRepoContents = async ({ orgUser, repoName, gitToken, includeExt, excludeExt, directory, chatId, parentMessageId }) => {
+export const fetchGitRepoContents = async ({ orgUser, repoName, gitToken, includeExt, excludeExt, directory, branch, chatId, parentMessageId }) => {
     try {
-        const result = await fetchGitRepoContentsCallable({ orgUser, repoName, gitToken, includeExt, excludeExt, directory, chatId, parentMessageId });
+        const result = await fetchGitRepoContentsCallable({ orgUser, repoName, gitToken, includeExt, excludeExt, directory, branch, chatId, parentMessageId });
         return result.data; // { success, name, storageUrl, type, mimeType, messageId, preview }
     } catch (error) {
         console.error("Error calling fetchGitRepoContents callable:", error);

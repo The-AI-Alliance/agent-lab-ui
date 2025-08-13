@@ -9,6 +9,7 @@ const GitRepoContextModal = ({ open, onClose, onSubmit }) => {
     const [includeExt, setIncludeExt] = useState('');
     const [excludeExt, setExcludeExt] = useState('');
     const [directory, setDirectory] = useState('');
+    const [branch, setBranch] = useState('main');
     const [formError, setFormError] = useState('');
 
     const handleSubmit = () => {
@@ -30,6 +31,7 @@ const GitRepoContextModal = ({ open, onClose, onSubmit }) => {
             includeExt: includeExt.trim() ? includeExt.split(',').map(e => e.trim().replace(/^\./, '').toLowerCase()) : [],
             excludeExt: excludeExt.trim() ? excludeExt.split(',').map(e => e.trim().replace(/^\./, '').toLowerCase()) : [],
             directory: directory.trim() || '', // Send empty string for root, backend will handle
+            branch: branch.trim() || 'main', // Default to main if empty
         });
         handleClose();
     };
@@ -41,6 +43,7 @@ const GitRepoContextModal = ({ open, onClose, onSubmit }) => {
         setIncludeExt('');
         setExcludeExt('');
         setDirectory('');
+        setBranch('main');
         setFormError('');
         onClose();
     };
@@ -76,7 +79,19 @@ const GitRepoContextModal = ({ open, onClose, onSubmit }) => {
                                 onChange={(e) => setRepoName(e.target.value)}
                             />
                         </Grid>
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                margin="dense"
+                                id="git-branch"
+                                label="Branch (Optional)"
+                                fullWidth
+                                variant="outlined"
+                                value={branch}
+                                onChange={(e) => setBranch(e.target.value)}
+                                helperText="Branch to fetch from. Defaults to 'main' if blank."
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
                             <TextField
                                 margin="dense"
                                 id="git-token"
