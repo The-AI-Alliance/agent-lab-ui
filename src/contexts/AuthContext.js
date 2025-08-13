@@ -1,8 +1,9 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { googleProvider } from '../firebaseConfig';
 import { ensureUserProfile } from '../services/firebaseService'; // Import new function
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -14,22 +15,43 @@ export const AuthProvider = ({ children }) => {
     const logout = () => signOut(auth);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        let unsubscribeUserDoc = null;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // User is signed in, ensure their profile exists in Firestore
-                // and get their full profile including permissions.
-                const userProfile = await ensureUserProfile(user);
-                setCurrentUser({
-                    ...user, // Firebase Auth user object (uid, email, displayName, photoURL)
-                    ...userProfile, // Firestore profile data (uid, email, ..., permissions)
+                // Ensure user profile exists in Firestore
+                await ensureUserProfile(user);
+
+                // Subscribe to Firestore user document for real-time updates
+                const userDocRef = doc(db, 'users', user.uid);
+                unsubscribeUserDoc = onSnapshot(userDocRef, (docSnapshot) => {
+                    if (docSnapshot.exists()) {
+                        const userProfile = docSnapshot.data();
+                        setCurrentUser({
+                            ...user,
+                            ...userProfile,
+                        });
+                    } else {
+                        // If user doc does not exist, fallback to just auth user
+                        setCurrentUser({ ...user });
+                    }
+                    setLoading(false);
                 });
             } else {
                 // User is signed out
                 setCurrentUser(null);
+                setLoading(false);
+                if (unsubscribeUserDoc) {
+                    unsubscribeUserDoc();
+                    unsubscribeUserDoc = null;
+                }
             }
-            setLoading(false);
         });
-        return unsubscribe;
+
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeUserDoc) unsubscribeUserDoc();
+        };
     }, []);
 
     const value = { currentUser, loginWithGoogle, logout, loading };
