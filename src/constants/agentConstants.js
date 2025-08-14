@@ -50,9 +50,21 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true, // LiteLLM seems to allow passing api_key for Gemini
         liteLlmModelPrefix: "gemini",
         models: [
-            { id: "gemini-2.5-pro-preview-06-05", name: "Gemini 2.5 Pro (Preview)", supportedModes: ['text', 'image'] },
-            { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash (Latest)", supportedModes: ['text', 'image'] },
-            { id: "gemini-pro", name: "Gemini 1.0 Pro", supportedModes: ['text'] },
+            { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", supportedModes: ['text', 'image'] },
+            { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", supportedModes: ['text', 'image'] },
+            { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", supportedModes: ['text', 'image'] },
+            { id: "gemini-live-2.5-flash-preview", name: "Gemini 2.5 Flash Live", supportedModes: ['text', 'audio'] },
+            { id: "gemini-2.5-flash-preview-native-audio-dialog", name: "Gemini 2.5 Flash Native Audio Dialog", supportedModes: ['text', 'audio'] },
+            { id: "gemini-2.5-flash-exp-native-audio-thinking-dialog", name: "Gemini 2.5 Flash Native Audio Thinking Dialog", supportedModes: ['text', 'audio'] },
+            { id: "gemini-2.5-flash-preview-tts", name: "Gemini 2.5 Flash Preview Text-to-Speech", supportedModes: ['audio'] },
+            { id: "gemini-2.5-pro-preview-tts", name: "Gemini 2.5 Pro Preview Text-to-Speech", supportedModes: ['audio'] },
+            { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", supportedModes: ['text', 'image'] },
+            { id: "gemini-2.0-flash-preview-image-generation", name: "Gemini 2.0 Flash Preview Image Generation", supportedModes: ['text', 'image'] },
+            { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash-Lite", supportedModes: ['text'] },
+            { id: "gemini-2.0-flash-live-001", name: "Gemini 2.0 Flash Live", supportedModes: ['text', 'audio'] },
+            { id: "gemini-1.5-flash-latest", name: "Gemini 1.5 Flash", supportedModes: ['text'] },
+            { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash-8B", supportedModes: ['text'] },
+            { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", supportedModes: ['text'] },
         ]
     },
     {
@@ -64,9 +76,12 @@ export const MODEL_PROVIDERS_LITELLM = [
         allowsCustomKey: true,
         liteLlmModelPrefix: "anthropic",
         models: [
-            { id: "claude-3-opus-20240229", name: "Claude 3 Opus", supportedModes: ['text', 'image'] },
-            { id: "claude-3-sonnet-20240229", name: "Claude 3 Sonnet", supportedModes: ['text', 'image'] },
-            { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku", supportedModes: ['text', 'image'] },
+            { id: "claude-opus-4-1-20250805", name: "Claude Opus 4.1", supportedModes: ['text', 'image'] },
+            { id: "claude-opus-4-20250514", name: "Claude Opus 4", supportedModes: ['text', 'image'] },
+            { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", supportedModes: ['text', 'image'] },
+            { id: "claude-3-7-sonnet-20250219", name: "Claude Sonnet 3.7", supportedModes: ['text', 'image'] },
+            { id: "claude-3-5-haiku-20241022", name: "Claude Haiku 3.5", supportedModes: ['text', 'image'] },
+            { id: "claude-3-haiku-20240307", name: "Claude Haiku 3", supportedModes: ['text'] },
         ]
     },
     {
