@@ -425,7 +425,7 @@ const ChatPage = () => {
                                 )}
 
                                 {/* Render each legacy file_data as its own context bubble below the message */}
-                                {fileDataParts.map((part, idx) => {
+                                {!isContextMessage && fileDataParts.map((part, idx) => {
                                     const item = convertPartToContextItem(part);
                                     const openDetails = () => {
                                         setContextDetailsItems([item]);
