@@ -181,12 +181,7 @@ def fetch_repo_file_content(session: httpx.Client, owner, repo, path, token, bra
         return None
 
 def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, include_ext, exclude_ext, files_list, processed_paths, branch, depth=0):
-    if depth > 10:
-        logger.warn(f"Max recursion depth reached for path: '{path}' in {owner}/{repo}")
-        return
-    MAX_FILES_PER_REPO = 100
-    if len(files_list) >= MAX_FILES_PER_REPO:
-        return
+    
     headers = {"Accept": "application/vnd.github.v3+json"}
     if token:
         headers["Authorization"] = f"token {token}"
@@ -199,7 +194,7 @@ def list_repo_files_recursive(session: httpx.Client, owner, repo, path, token, i
         if not isinstance(contents, list): return
 
         for item in contents:
-            if len(files_list) >= MAX_FILES_PER_REPO: break
+            
             item_path, item_type, item_name = item.get("path"), item.get("type"), item.get("name")
             if not all([item_path, item_type, item_name]) or item_path in processed_paths: continue
             processed_paths.add(item_path)
@@ -276,9 +271,13 @@ def _fetch_git_repo_contents_logic(req: https_fn.CallableRequest):
         make_public=False
     )
 
-    # Preview: list of all files separated by line carriage (newline)
-    preview_list = "\n".join([meta["path"] for meta in files_to_fetch_meta])
-    preview_map = {"type": "file_list", "value": preview_list}
+    # Preview: if files count exceeds MAX_FILES_PER_REPO, show count only, else list all files
+    MAX_FILES_PER_REPO = 100
+    if len(files_to_fetch_meta) > MAX_FILES_PER_REPO:
+        preview_value = f"{len(files_to_fetch_meta)} files loaded from repository."
+    else:
+        preview_value = "\n".join([meta["path"] for meta in files_to_fetch_meta])
+    preview_map = {"type": "file_list", "value": preview_value}
 
     message_id = _create_context_message(
         user_id=req.auth.uid,
