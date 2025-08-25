@@ -1,99 +1,111 @@
-# Deploying a Gofannon FastMCP Server with Git Tools to Google Cloud Run
+# Deploying the Gofannon MCP Server to Google Cloud Run
 
-This guide shows you how to deploy a Python-based **MCP server** to [Google Cloud Run](https://cloud.google.com/run/docs/deploying). The server is built with [FastMCP](https://github.com/supercorp-ai/fastmcp) and uses Git-related tools from the `gofannon` library.
+This guide explains how to deploy the `gofannon-mcp-grants` server to Google Cloud Run. This server uses the FastMCP framework to expose grant-matching tools from the `gofannon` library as a web service.
 
-This server **natively supports HTTP streaming**, making it a lightweight and efficient service. We will use a streamlined deployment method where Google Cloud builds and deploys the container for you in a single step.
+## Overview
 
----
+The deployment process leverages Google Cloud Build to automatically build a container image from the provided `Dockerfile` and then deploy it to Cloud Run. The key files involved are:
+
+-   **`Dockerfile`**: Defines the container environment, installs dependencies using `uv`, and specifies the command to run the server.
+-   **`server.py`**: The main application file that initializes the FastMCP server and registers the `gofannon` tools.
+-   **`pyproject.toml`**: Defines the project's Python dependencies.
+-   **`launch.sh`**: A simple shell script that contains the `gcloud` command to build and deploy the service.
 
 ## Prerequisites
 
-- A Google Cloud project with billing enabled.
-- `gcloud` CLI installed and authenticated (`gcloud init`).
-- A **GitHub Personal Access Token** with `repo` scope to use as your `GITHUB_API_KEY`.
-- Your project files in a single directory: `main.py`, `Dockerfile`, and `requirements.txt`.
+Before you begin, ensure you have the following:
 
----
+1.  **Google Cloud SDK**: The `gcloud` command-line tool must be installed and authenticated. You can find installation instructions [here](https://cloud.google.com/sdk/docs/install).
+2.  **Google Cloud Project**: A project with billing enabled.
+3.  **Enabled APIs**: The Cloud Run and Cloud Build APIs must be enabled for your project. You can enable them with the following commands:
+    ``` bash
+    gcloud services enable run.googleapis.com
+    gcloud services enable cloudbuild.googleapis.com
+    ```
+4.  **Simpler Grants API Key**: You need an API key for the Simpler Grants service, which is used by the underlying `gofannon` tools.
 
-## About the MCP Server and Native HTTP Streaming
+## Step 1: Set Up Your Environment
 
-The server uses two key components:
+1.  **Get the code**: Clone the repository or download the project files to your local machine.
 
-- **FastMCP**: A Python framework for building high-performance MCP servers.
-- **Gofannon**: A library of tools, here specifically used for interacting with GitHub repositories.
-- **Native HTTP Streaming**: The server directly implements an HTTP streaming transport, allowing it to function as a standard web service on Cloud Run, which automatically handles requests, scaling, and SSL.
+2.  **Set your Google Cloud Project**: Configure `gcloud` to use your target project.
+    ``` bash
+    gcloud config set project YOUR_PROJECT_ID
+    ```
 
-This architecture is simpler and more efficient than using a stdio-based server, as the entire application runs within a single, self-contained container.
+3.  **Set the Region**: Define an environment variable for the Google Cloud region where you want to deploy the service.
+    ``` bash
+    export REGION="us-central1" # Or any other supported Cloud Run region
+    ```
 
----
+## Step 2: Configure the Deployment Script
 
-## Step 1: Deploy to Google Cloud Run
+The `launch.sh` script handles the deployment. You must edit it to include your Simpler Grants API key.
 
-Instead of manually building a container and pushing it to a registry, we can use the `--source .` flag to have `gcloud` handle everything. This command will:
-1.  Read the `Dockerfile` in your current directory.
-2.  Use Google Cloud Build to build the container image.
-3.  Push the image to Google Artifact Registry automatically.
-4.  Deploy the new image to Cloud Run.
+1.  Open the `launch.sh` file.
+2.  Find the line with `--set-env-vars`.
+3.  Replace the placeholder `<YOUR_SIMPLER_GRANTS_API_KEY>` with your actual API key.
 
-Navigate to your project's root directory and run the command below.
-
-**Replace `<YOUR_GITHUB_API_KEY>` with your actual GitHub Personal Access Token.**
-
-```bash
-# Set your preferred deployment region
-export REGION=us-central1
-
-gcloud run deploy gofannon-git-mcp-server \
+**Original `launch.sh`:**
+``` bash
+gcloud run deploy gofannon-mcp-grants \
   --source . \
-  --platform=managed \
   --allow-unauthenticated \
   --region=$REGION \
-  --port=8080 \
-  --set-env-vars "GITHUB_API_KEY=<YOUR_GITHUB_API_KEY>"
+  --set-env-vars "SIMPLER_GRANTS_API_KEY=<YOUR_SIMPLER_GRANTS_API_KEY>"
 ```
 
-**Note:** The first time you run this command, `gcloud` may prompt you to enable the Cloud Build API and Artifact Registry API. Answer `y` (yes) to proceed.
-
-### Explanation of the Command
-
-- **`gcloud run deploy gofannon-git-mcp-server`**: Deploys a new service with the specified name.
-- **`--source .`**: This is the key flag. It tells Cloud Run to build the container from the source code in the current directory (`.`) using the provided `Dockerfile`.
-- **`--platform=managed`**: Uses the fully managed, serverless Cloud Run environment.
-- **`--allow-unauthenticated`**: Allows public access. For production, you should configure IAM-based authentication.
-- **`--region`**: The deployment region.
-- **`--port=8080`**: Informs Cloud Run that your container listens on port 8080.
-- **`--set-env-vars "GITHUB_API_KEY=..."`**: Securely provides the GitHub API key to your running container as an environment variable, which `main.py` requires to start.
-
----
-
-## After Deployment
-
-Cloud Run will provide a public service URL (e.g., `https://gofannon-git-mcp-server-xxxxxxxx-uc.a.run.app`). You can now interact with your server.
-
-You can check the health endpoint to confirm it's running:
-```bash
-curl https://<YOUR_CLOUD_RUN_URL>/healthz
+**Example after editing:**
+``` bash
+gcloud run deploy gofannon-mcp-grants \
+  --source . \
+  --allow-unauthenticated \
+  --region=$REGION \
+  --set-env-vars "SIMPLER_GRANTS_API_KEY=abcdef1234567890"
 ```
 
-Your MCP tools are available at the `/mcp` endpoint:
-```bash
-curl https://<YOUR_CLOUD_RUN_URL>/mcp
+## Step 3: Deploy the Server
+
+Once the configuration is complete, you can deploy the application by running the launch script.
+
+1.  Make sure the script is executable:
+    ``` bash
+    chmod +x launch.sh
+    ```
+
+2.  Run the script:
+    ``` bash
+    ./launch.sh
+    ```
+
+This command will:
+-   **Trigger Cloud Build**: It uploads your source code (the current directory) to Google Cloud.
+-   **Build the Container**: Cloud Build uses the `Dockerfile` to build a container image. It runs `uv sync` to install all Python dependencies specified in `pyproject.toml` and `uv.lock`.
+-   **Push to Artifact Registry**: The newly built image is pushed to a Google-managed Artifact Registry repository.
+-   **Deploy to Cloud Run**: The image is deployed as a service named `gofannon-mcp-grants`. The service is configured to be publicly accessible (`--allow-unauthenticated`) and will have the `SIMPLER_GRANTS_API_KEY` environment variable available to it.
+
+The process will take a few minutes. Upon completion, the `gcloud` tool will output the **Service URL**.
+
+## Step 4: Verify the Deployment
+
+After a successful deployment, you will receive a URL for your service. You can verify that the server is running by accessing its root URL in a web browser or with a tool like `curl`.
+
+``` bash
+# Replace YOUR_SERVICE_URL with the URL from the deployment output
+curl YOUR_SERVICE_URL
 ```
 
----
+You should see a JSON response from the FastMCP server, confirming that it is running and listing the available tools.
 
-## Resources
+``` json
+{
+  "name": "MCP Server on Cloud Run",
+  "tools": {
+    "gofannon.simpler_grants_gov.query_opportunities": { ... },
+    "gofannon.grant_query.grant_query": { ... }
+  },
+  "mcp_version": "1.0"
+}
+```
 
-- [Google Cloud Run Deployment Docs (From Source)](https://cloud.google.com/run/docs/deploying-source-code)
-- [FastMCP on GitHub](https://github.com/supercorp-ai/fastmcp)
-- [Building Python Containers for Cloud Run](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/python)
-
----
-
-## Summary
-
-This setup provides a robust, scalable, and secure way to run a `gofannon`-powered MCP server on Google Cloud. By using the `--source .` deployment method, you create a self-contained service with a minimal number of steps, allowing Cloud Run's managed infrastructure to handle the heavy lifting of containerization and deployment.
-
----
-
-**Happy deploying! 🚀**
+Your Gofannon MCP server is now deployed and ready to be used by any MCP-compatible client.

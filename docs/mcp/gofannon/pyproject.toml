@@ -1,0 +1,9 @@
+[project]
+name = "gofannon-mcp-grants"
+version = "0.1.0"
+description = "Gofannon Grant Matching MCP Server on Cloud Run"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp==2.6.1",
+    "gofannon>=0.25.35",
+]

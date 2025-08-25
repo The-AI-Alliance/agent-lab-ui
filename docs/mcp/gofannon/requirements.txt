@@ -1,7 +1,0 @@
-# requirements.txt
-fastmcp
-uvicorn
-requests
-GitPython
-gofannon
-
