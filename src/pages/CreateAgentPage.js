@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom'; // Added useLocation
 import AgentForm from '../components/agents/AgentForm';
 import { useAuth } from '../contexts/AuthContext';
-import { createAgentInFirestore, getAgentDetails, updateAgentInFirestore } from '../services/firebaseService';
+import { createAgentInFirestore, getAgentDetails, updateAgentInFirestore } from '../services/agentFirestoreService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import { Container, Typography, Box } from '@mui/material';

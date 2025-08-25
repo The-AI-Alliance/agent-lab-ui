@@ -1,7 +1,8 @@
 // src/pages/AgentDetailsPage.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
-import { getAgentDetails, getModelDetails } from '../services/firebaseService';
+import { getAgentDetails } from '../services/agentFirestoreService';
+import { getModelDetails } from '../services/modelService';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';

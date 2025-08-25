@@ -4,7 +4,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button,
     List, ListItemButton, ListItemText, CircularProgress, Alert, Typography, Box
 } from '@mui/material';
-import { getMyAgents } from '../../services/firebaseService'; // UPDATED: Changed from getUserAgents
+import { getMyAgents } from '../../services/agentFirestoreService'; // UPDATED
 import { useAuth } from '../../contexts/AuthContext';
 
 const ExistingAgentSelectorDialog = ({ open, onClose, onAgentSelected }) => {
@@ -17,7 +17,7 @@ const ExistingAgentSelectorDialog = ({ open, onClose, onAgentSelected }) => {
         if (open && currentUser) {
             setLoading(true);
             setError(null);
-            getMyAgents(currentUser.uid) // UPDATED: Changed from getUserAgents
+            getMyAgents(currentUser.uid) // UPDATED
                 .then(agents => {
                     setAvailableAgents(agents);
                 })

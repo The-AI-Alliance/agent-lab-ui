@@ -1,10 +1,10 @@
 // src/pages/ProjectDetailsPage.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
-import {
-    getProjectDetails, getAgentsForProjects, getModelsForProjects, getChatsForProjects, createChat,
-    updateChat, deleteChat, updateProject, deleteProject
-} from '../services/firebaseService';
+import { getProjectDetails, updateProject, deleteProject } from '../services/projectService';
+import { getAgentsForProjects, updateAgentInFirestore } from '../services/agentFirestoreService';
+import { getModelsForProjects, updateModel } from '../services/modelService';
+import { getChatsForProjects, createChat, updateChat, deleteChat } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
@@ -23,7 +23,6 @@ import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import SaveIcon from '@mui/icons-material/Save';
 
 import LinkOffIcon from '@mui/icons-material/LinkOff';
-import { updateModel, updateAgentInFirestore } from '../services/firebaseService';
 
 function TabPanel(props) {
     const { children, value, index, ...other } = props;

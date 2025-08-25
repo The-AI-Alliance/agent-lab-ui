@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { createModel, getModelDetails, updateModel } from '../services/firebaseService';
+import { createModel, getModelDetails, updateModel } from '../services/modelService';
 import ModelForm from '../components/models/ModelForm';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';

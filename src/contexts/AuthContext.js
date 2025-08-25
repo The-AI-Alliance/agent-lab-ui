@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { auth, db } from '../firebaseConfig';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { googleProvider } from '../firebaseConfig';
-import { ensureUserProfile } from '../services/firebaseService'; // Import new function
+import { ensureUserProfile } from '../services/userService'; // Import new function
 import { doc, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();

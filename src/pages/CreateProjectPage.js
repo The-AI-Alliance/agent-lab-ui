@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { createProject } from '../services/firebaseService';
+import { createProject } from '../services/projectService';
 import {
     Container, Typography, Paper, TextField, Button, Box, CircularProgress, FormHelperText
 } from '@mui/material';

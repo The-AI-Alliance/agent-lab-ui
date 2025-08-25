@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getMyAgents, getPublicAgents, deleteAgentFromFirestore, createAgentInFirestore, updateAgentInFirestore } from '../services/firebaseService';
+import { getMyAgents, getPublicAgents, deleteAgentFromFirestore, createAgentInFirestore, updateAgentInFirestore } from '../services/agentFirestoreService';
 import { deleteAgentDeployment } from '../services/agentService';
 import AgentList from '../components/agents/AgentList';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -301,4 +301,4 @@ const AgentsPage = () => {
     );
 };
 
-export default AgentsPage;  
+export default AgentsPage;

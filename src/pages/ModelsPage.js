@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getMyModels, getPublicModels } from '../services/firebaseService';
+import { getMyModels, getPublicModels, deleteModel } from '../services/modelService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import {
@@ -12,7 +12,6 @@ import AddIcon from '@mui/icons-material/Add';
 import PublicIcon from '@mui/icons-material/Public';
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
-import { deleteModel } from '../services/firebaseService'; 
 
 
 const ModelList = ({ models, onDelete }) => (

@@ -1,6 +1,6 @@
 // src/pages/AdminPage.js
 import React, { useState, useEffect } from 'react';
-import { getUsersForAdminReview, updateUserPermissions } from '../services/firebaseService';
+import { getUsersForAdminReview, updateUserPermissions } from '../services/userService';
 import UserPermissionDialog from '../components/admin/UserPermissionDialog';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';

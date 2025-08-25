@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getProjects } from '../services/firebaseService';
+import { getProjects } from '../services/projectService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import {
@@ -88,4 +88,4 @@ const ProjectsPage = () => {
     );
 };
 
-export default ProjectsPage;  
+export default ProjectsPage;

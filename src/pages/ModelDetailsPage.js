@@ -1,7 +1,7 @@
 // src/pages/ModelDetailsPage.js
 import React, { useState, useEffect } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { getModelDetails } from '../services/firebaseService';
+import { getModelDetails } from '../services/modelService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import {
@@ -79,4 +79,4 @@ const ModelDetailsPage = () => {
     );
 };
 
-export default ModelDetailsPage;  
+export default ModelDetailsPage;

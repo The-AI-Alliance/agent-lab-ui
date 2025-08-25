@@ -1,6 +1,6 @@
 // src/components/models/ModelSelector.js
 import React, { useState, useEffect } from 'react';
-import { getModelsForProjects, getMyModels } from '../../services/firebaseService';
+import { getModelsForProjects, getMyModels } from '../../services/modelService';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     FormControl, InputLabel, Select, MenuItem, FormHelperText, CircularProgress, Box
@@ -75,4 +75,4 @@ const ModelSelector = ({ selectedModelId, onSelectionChange, projectIds = [], he
     );
 };
 
-export default ModelSelector;  
+export default ModelSelector;

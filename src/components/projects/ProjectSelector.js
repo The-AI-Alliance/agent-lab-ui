@@ -1,6 +1,6 @@
 // src/components/projects/ProjectSelector.js
 import React, { useState, useEffect } from 'react';
-import { getProjects } from '../../services/firebaseService';
+import { getProjects } from '../../services/projectService';
 import { useAuth } from '../../contexts/AuthContext';
 import {
     FormControl, InputLabel, Select, MenuItem, Chip, Box, OutlinedInput, Checkbox, ListItemText,
@@ -86,4 +86,4 @@ const ProjectSelector = ({ selectedProjectIds, onSelectionChange, helperText, re
     );
 };
 
-export default ProjectSelector;  
+export default ProjectSelector;

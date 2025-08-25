@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchA2AAgentCard } from '../services/agentService';
-import { createAgentInFirestore, getAgentDetails, updateAgentInFirestore } from '../services/firebaseService';
+import { createAgentInFirestore, getAgentDetails, updateAgentInFirestore } from '../services/agentFirestoreService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorMessage from '../components/common/ErrorMessage';
 import ProjectSelector from '../components/projects/ProjectSelector';
