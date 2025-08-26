@@ -18,7 +18,7 @@ async def _run_agent_and_collect_events(agent_run_coroutine, events_collection_r
     """Generic runner that executes an agent, collects all events, and stores them in Firestore."""
     all_events, errors = [], []
     try:
-        for event_obj in agent_run_coroutine:
+        async for event_obj in agent_run_coroutine:
             event_dict = event_obj.model_dump() if hasattr(event_obj, 'model_dump') else event_obj
             all_events.append(event_dict)
     except Exception as e_run:
