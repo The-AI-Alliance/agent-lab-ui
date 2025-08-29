@@ -1,0 +1,15 @@
+{
+    "id": "openai_compatible",
+    "name": "OpenAI Compatible Endpoint",
+    "apiBase": null,
+    "requiresApiKeyInEnv": null,
+    "allowsCustomBase": true,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "openai",
+    "models": [
+        { "id": "your-custom-model-name-1", "name": "Custom Model 1 (User Defined)", "supportedModes": ["text", "image"] },
+        { "id": "your-custom-model-name-2", "name": "Custom Model 2 (User Defined)", "supportedModes": ["text", "image"] }
+    ],
+    "isCustomEndpoint": true,
+    "customInstruction": "For OpenAI-compatible endpoints, provide the API Base URL. The Model String should be the model name expected by your endpoint."
+}

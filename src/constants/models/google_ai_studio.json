@@ -1,0 +1,26 @@
+{
+    "id": "google_ai_studio",
+    "name": "Google AI Studio (Gemini)",
+    "apiBase": "https://generativelanguage.googleapis.com",
+    "requiresApiKeyInEnv": "GEMINI_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "gemini",
+    "models": [
+        { "id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "supportedModes": ["text", "image"] },
+        { "id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "supportedModes": ["text", "image"] },
+        { "id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash-Lite", "supportedModes": ["text", "image"] },
+        { "id": "gemini-live-2.5-flash-preview", "name": "Gemini 2.5 Flash Live", "supportedModes": ["text", "audio"] },
+        { "id": "gemini-2.5-flash-preview-native-audio-dialog", "name": "Gemini 2.5 Flash Native Audio Dialog", "supportedModes": ["text", "audio"] },
+        { "id": "gemini-2.5-flash-exp-native-audio-thinking-dialog", "name": "Gemini 2.5 Flash Native Audio Thinking Dialog", "supportedModes": ["text", "audio"] },
+        { "id": "gemini-2.5-flash-preview-tts", "name": "Gemini 2.5 Flash Preview Text-to-Speech", "supportedModes": ["audio"] },
+        { "id": "gemini-2.5-pro-preview-tts", "name": "Gemini 2.5 Pro Preview Text-to-Speech", "supportedModes": ["audio"] },
+        { "id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "supportedModes": ["text", "image"] },
+        { "id": "gemini-2.0-flash-preview-image-generation", "name": "Gemini 2.0 Flash Preview Image Generation", "supportedModes": ["text", "image"] },
+        { "id": "gemini-2.0-flash-lite", "name": "Gemini 2.0 Flash-Lite", "supportedModes": ["text"] },
+        { "id": "gemini-2.0-flash-live-001", "name": "Gemini 2.0 Flash Live", "supportedModes": ["text", "audio"] },
+        { "id": "gemini-1.5-flash-latest", "name": "Gemini 1.5 Flash", "supportedModes": ["text"] },
+        { "id": "gemini-1.5-flash-8b", "name": "Gemini 1.5 Flash-8B", "supportedModes": ["text"] },
+        { "id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "supportedModes": ["text"] }
+    ]
+}

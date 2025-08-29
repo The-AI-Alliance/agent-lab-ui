@@ -1,0 +1,15 @@
+{
+    "id": "deepinfra",
+    "name": "DeepInfra",
+    "apiBase": "https://api.deepinfra.com/v1/openai",
+    "requiresApiKeyInEnv": "DEEPINFRA_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "deepinfra",
+    "models": [
+        { "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "name": "Llama 3.3 70B Instruct Turbo (DeepInfra)", "supportedModes": ["text"] },
+        { "id": "meta-llama/Meta-Llama-3-70B-Instruct", "name": "Llama 3 70B Instruct (DeepInfra)", "supportedModes": ["text"] },
+        { "id": "mistralai/Mistral-7B-Instruct-v0.1", "name": "Mistral 7B Instruct (DeepInfra)", "supportedModes": ["text"] }
+    ],
+    "customInstruction": "For DeepInfra, Model String is the full model path (e.g., meta-llama/Meta-Llama-3-8B-Instruct)."
+}

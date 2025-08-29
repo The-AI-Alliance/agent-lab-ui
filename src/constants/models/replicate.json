@@ -1,0 +1,14 @@
+{
+    "id": "replicate",
+    "name": "Replicate",
+    "apiBase": "https://api.replicate.com/v1",
+    "requiresApiKeyInEnv": "REPLICATE_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "replicate",
+    "models": [
+        { "id": "meta/meta-llama-3-8b-instruct", "name": "Llama 3 8B Instruct (Replicate)", "supportedModes": ["text"] },
+        { "id": "mistralai/mistral-7b-instruct-v0.2", "name": "Mistral 7B Instruct v0.2 (Replicate)", "supportedModes": ["text"] }
+    ],
+    "customInstruction": "For Replicate, Model String is owner/model-name or owner/model-name:version-hash (e.g., meta/meta-llama-3-8b-instruct)."
+}

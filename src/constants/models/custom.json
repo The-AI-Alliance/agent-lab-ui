@@ -1,0 +1,15 @@
+{
+    "id": "custom",
+    "name": "Custom (Advanced)",
+    "apiBase": null,
+    "requiresApiKeyInEnv": null,
+    "allowsCustomBase": true,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": null,
+    "models": [
+        { "id": "custom/my-ollama-model", "name": "Example: My Ollama Model (User Defined)", "supportedModes": ["text", "image"]},
+        { "id": "custom/my-vllm-endpoint", "name": "Example: My vLLM Model (User Defined)", "supportedModes": ["text", "image"]}
+    ],
+    "isCustomEndpoint": true,
+    "customInstruction": "For custom providers, enter the complete LiteLLM model string (e.g., 'ollama/mistral', 'groq/mixtral-8x7b-32768'). You may also need to set API Base and/or API Key overrides if not configured in the backend environment."
+}

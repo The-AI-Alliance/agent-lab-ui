@@ -1,0 +1,17 @@
+{
+    "id": "anthropic",
+    "name": "Anthropic (Claude)",
+    "apiBase": "https://api.anthropic.com",
+    "requiresApiKeyInEnv": "ANTHROPIC_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "anthropic",
+    "models": [
+        { "id": "claude-opus-4-1-20250805", "name": "Claude Opus 4.1", "supportedModes": ["text", "image"] },
+        { "id": "claude-opus-4-20250514", "name": "Claude Opus 4", "supportedModes": ["text", "image"] },
+        { "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "supportedModes": ["text", "image"] },
+        { "id": "claude-3-7-sonnet-20250219", "name": "Claude Sonnet 3.7", "supportedModes": ["text", "image"] },
+        { "id": "claude-3-5-haiku-20241022", "name": "Claude Haiku 3.5", "supportedModes": ["text", "image"] },
+        { "id": "claude-3-haiku-20240307", "name": "Claude Haiku 3", "supportedModes": ["text"] }
+    ]
+}

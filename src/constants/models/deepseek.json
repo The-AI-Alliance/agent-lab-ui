@@ -1,0 +1,13 @@
+{
+    "id": "deepseek",
+    "name": "Deepseek",
+    "apiBase": "https://api.deepseek.com/v1",
+    "requiresApiKeyInEnv": "DEEPSEEK_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "deepseek",
+    "models": [
+        { "id": "deepseek-chat", "name": "Deepseek Chat" },
+        { "id": "deepseek-coder", "name": "Deepseek Coder" }
+    ]
+}

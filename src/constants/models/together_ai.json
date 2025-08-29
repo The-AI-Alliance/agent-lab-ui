@@ -1,0 +1,16 @@
+{
+    "id": "together_ai",
+    "name": "TogetherAI",
+    "apiBase": "https://api.together.xyz/v1",
+    "requiresApiKeyInEnv": "TOGETHER_AI_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "together_ai",
+    "models": [
+        { "id": "mistralai/Mixtral-8x7B-Instruct-v0.1", "name": "Mixtral 8x7B Instruct (TogetherAI)", "supportedModes": ["text"] },
+        { "id": "meta-llama/Llama-3-8b-chat-hf", "name": "Llama 3 8B Chat (TogetherAI)", "supportedModes": ["text"] },
+        { "id": "meta-llama/Llama-3-70b-chat-hf", "name": "Llama 3 70B Chat (TogetherAI)", "supportedModes": ["text"] },
+        { "id": "databricks/dbrx-instruct", "name": "DBRX Instruct (TogetherAI)", "supportedModes": ["text"]}
+    ],
+    "customInstruction": "For TogetherAI, Model String is the full model path (e.g., mistralai/Mixtral-8x7B-Instruct-v0.1)."
+}

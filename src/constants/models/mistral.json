@@ -1,0 +1,16 @@
+{
+    "id": "mistral",
+    "name": "Mistral AI",
+    "apiBase": "https://api.mistral.ai/v1",
+    "requiresApiKeyInEnv": "MISTRAL_API_KEY",
+    "allowsCustomBase": false,
+    "allowsCustomKey": true,
+    "liteLlmModelPrefix": "mistral",
+    "models": [
+        { "id": "mistral-large-latest", "name": "Mistral Large (Latest)", "supportedModes": ["text"] },
+        { "id": "mistral-medium-latest", "name": "Mistral Medium (Latest)", "supportedModes": ["text"] },
+        { "id": "mistral-small-latest", "name": "Mistral Small (Latest)", "supportedModes": ["text"] },
+        { "id": "open-mixtral-8x7b", "name": "Mixtral 8x7B (Open)", "supportedModes": ["text"] },
+        { "id": "open-mistral-7b", "name": "Mistral 7B (Open)", "supportedModes": ["text"] }
+    ]
+}
